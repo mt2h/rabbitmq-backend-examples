@@ -66,7 +66,7 @@ QUEUE_NAME = "step1_queue"
 # Host/puerto configurables por variable de entorno para poder meter un
 # proxy en medio (p.ej. mitmproxy) sin tocar el codigo.
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
-RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", "5673"))
+RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", "5672"))
 
 
 def main():

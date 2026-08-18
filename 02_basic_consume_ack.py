@@ -85,7 +85,7 @@ import pika
 QUEUE_NAME = "step2_queue"
 
 RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
-RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", "5673"))
+RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", "5672"))
 
 
 def connect():

@@ -14,12 +14,16 @@ consumer un mensaje nuevo si ya tiene N sin confirmar". Es el control de flujo
 que evita que un consumer se sature (o acapare trabajo que otro podria hacer
 mas rapido).
 
-Esto ES el mismo mecanismo que Celery usa: `worker_prefetch_multiplier` (por
-defecto 4, pero el incidente real de OZ lo tenia en 1) multiplicado por
-`--concurrency` define el prefetch_count real que Celery le pide a Rabbit.
-Con multiplier=1 y concurrency=2, cada worker Celery le dice a Rabbit "dame
-maximo 2 tareas sin confirmar" -- ni una mas, aunque haya 500 esperando en la
-cola. Eso es EXACTAMENTE lo que probamos aqui con dos consumers propios.
+Esto ES el mismo mecanismo que Celery usa: `worker_prefetch_multiplier`
+(por defecto 4) multiplicado por `--concurrency` define el prefetch_count
+real que Celery le pide a Rabbit. Por ejemplo, con el default (multiplier=4)
+y `--concurrency=2`, ese worker Celery le pide a Rabbit "dame maximo 8 tareas
+sin confirmar" -- el doble de tareas de las que en verdad puede procesar en
+paralelo (2), quedan 6 reservadas y esperando turno del lado del worker.
+Con multiplier=1 y concurrency=2, en cambio, cada worker Celery le dice a
+Rabbit "dame maximo 2 tareas sin confirmar" -- ni una mas, aunque haya 500
+esperando en la cola. Eso es EXACTAMENTE lo que probamos aqui con dos
+consumers propios (usando multiplier=1, o sea prefetch_count=1 por consumer).
 
 Diferencia con el semaphore que vamos a construir en el paso 07
 (WORKER_CONCURRENCY): prefetch_count lo hace cumplir RabbitMQ (a nivel de
@@ -148,9 +152,9 @@ def escenario_1_sin_limite():
 
     t_lento = threading.Thread(
         target=_worker,
-        args=("worker_lento", None, 1.0, procesados, NUM_MESSAGES, deadline),
+        args=("worker_lento", None, 1.0, procesados, NUM_MESSAGES, deadline),  # sin prefetch_count (ilimitado)
     )
-    t_lento.start()
+    t_lento.start()  # lanza el hilo, no bloquea
     time.sleep(0.5)  # asegurar que worker_lento ya esta suscrito
 
     _publish(NUM_MESSAGES)
@@ -158,12 +162,15 @@ def escenario_1_sin_limite():
 
     t_rapido = threading.Thread(
         target=_worker,
-        args=("worker_rapido", None, 0.1, procesados, NUM_MESSAGES, deadline),
+        args=("worker_rapido", None, 0.1, procesados, NUM_MESSAGES, deadline),  # sin prefetch_count (ilimitado)
     )
-    t_rapido.start()
+    t_rapido.start()  # lanza el hilo, no bloquea
 
-    t_lento.join()
-    t_rapido.join()
+    t_lento.join()  # bloquea aca ~10s; en la UI, Unacked=10 bajando de a uno cada 1s
+    t_rapido.join()  # no espera casi nada: worker_rapido ya termino con 0 procesados
+    # (en la UI, aca es donde la cola ya mostro Consumers=2 -- ambos suscritos --
+    # pero a worker_rapido nunca le llego nada porque Rabbit ya le habia dado
+    # los 10 a worker_lento antes de que este se suscribiera)
 
     print(f"worker_lento proceso: {len(procesados['worker_lento'])}")
     print(f"worker_rapido proceso: {len(procesados['worker_rapido'])}")
@@ -184,31 +191,39 @@ def escenario_2_con_prefetch_1():
 
     t_lento = threading.Thread(
         target=_worker,
-        args=("worker_lento", 1, 1.0, procesados, NUM_MESSAGES, deadline),
+        args=("worker_lento", 1, 1.0, procesados, NUM_MESSAGES, deadline),  # prefetch_count=1
     )
     t_rapido = threading.Thread(
         target=_worker,
-        args=("worker_rapido", 1, 0.1, procesados, NUM_MESSAGES, deadline),
+        args=("worker_rapido", 1, 0.1, procesados, NUM_MESSAGES, deadline),  # prefetch_count=1
     )
-    t_lento.start()
-    t_rapido.start()
+    t_lento.start()  # lanza el hilo, no bloquea
+    t_rapido.start()  # lanza el hilo, no bloquea
     time.sleep(0.5)  # asegurar que AMBOS ya esten suscritos con su QoS aplicado
 
     _publish(NUM_MESSAGES)
 
-    t_lento.join()
-    t_rapido.join()
+    t_lento.join()  # espera a que ese hilo termine
+    t_rapido.join()  # espera a que ese hilo termine
 
     print(f"worker_lento proceso: {len(procesados['worker_lento'])}")
     print(f"worker_rapido proceso: {len(procesados['worker_rapido'])}")
-    assert len(procesados["worker_lento"]) > 0, "con prefetch=1 worker_lento deberia procesar algo"
-    assert len(procesados["worker_rapido"]) > 0
+    # Lo unico que prefetch_count=1 garantiza es que nadie acapara los 10 de
+    # una (a diferencia del Escenario 1). Cuanto le toca a cada worker depende
+    # de una carrera de red al momento de basic_consume -- no determinista,
+    # asi que NO se puede asegurar que worker_lento siempre procese > 0.
+    # Tampoco es un reparto equitativo: worker_rapido (0.1s) suele terminar
+    # con la mayoria -- en el 1s que worker_lento tarda en soltar su unico
+    # slot, worker_rapido ya tuvo tiempo de comerse casi todo el resto de la
+    # cola. prefetch_count es control de flujo (cuantos "en vuelo" a la vez),
+    # no un balanceador de carga.
     assert len(procesados["worker_lento"]) + len(procesados["worker_rapido"]) == NUM_MESSAGES
     print(
         "Confirmado: con prefetch_count=1, ningun worker puede acaparar mas de "
         "1 mensaje sin confirmar -- el trabajo se reparte segun quien ackea "
-        "primero, y worker_lento SI alcanza a procesar algunos (a diferencia "
-        "del escenario 1, donde quedo en cero)."
+        "primero. Cuantos le tocan a cada uno varia de corrida en corrida "
+        "(depende de una carrera al momento de suscribirse), pero nunca los "
+        "10 de una como en el escenario 1."
     )
 
 
