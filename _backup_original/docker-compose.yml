@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: repro
+      POSTGRES_USER: repro
+      POSTGRES_PASSWORD: repro
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repro -d repro"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Simulated degraded downstream (stand-in for delivery-capacity-service).
+  downstream:
+    build: ./downstream
+    environment:
+      SLOW_SECONDS: "8"    # every call takes this long before answering
+      DOWNSTREAM_MODE: "slow"    # boot default; flip at runtime with POST /mode (see README)
+    ports:
+      - "9000:9000"
+
+  # The piece under test: two endpoints, same HTTPClient/CircuitBreaker code,
+  # different config. endpoint1 mirrors DeliveryCapacityServiceClient
+  # (timeout=500 bare int, circuit_breaker failure_threshold=999999).
+  # endpoint2 mirrors the stock_service_client.py pattern (split httpx.Timeout,
+  # real circuit breaker).
+  connector:
+    build: ./connector
+    depends_on:
+      db:
+        condition: service_healthy
+      downstream:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://repro:repro@db:5432/repro
+      DOWNSTREAM_URL: http://downstream:9000
+      WORKER_CONCURRENCY: "2"      # mirrors Celery `--concurrency=2` (prefork slots)
+      POOL_MAX_CONNECTIONS: "5"    # shrunk vs prod's 100 so exhaustion needs ~tens, not hundreds
+      BAD_TIMEOUT: "20"            # bare int -> connect=read=write=pool=20s (prod: 500)
+      GOOD_CONNECT_TIMEOUT: "2"
+      GOOD_READ_TIMEOUT: "12"      # comfortably above SLOW_SECONDS so a legit slow call still succeeds
+      GOOD_WRITE_TIMEOUT: "12"
+      GOOD_POOL_TIMEOUT: "1"       # fail fast when the pool itself is the problem
+      GOOD_CB_THRESHOLD: "3"
+    ports:
+      - "8000:8000"
+
+  # One-shot load generator. Not started by `docker compose up`; run explicitly
+  # with `docker compose run --rm loadtest ...` (see README.md).
+  loadtest:
+    build: ./loadtest
+    depends_on:
+      - connector
+    environment:
+      CONNECTOR_URL: http://connector:8000
+    profiles: ["tools"]

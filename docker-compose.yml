@@ -1,0 +1,9 @@
+services:
+  # RabbitMQ con el plugin de management activado.
+  # - 5672: puerto AMQP, el que usan las apps (y nuestro script) para conectarse.
+  # - 15672: interfaz web para ver colas, mensajes, conexiones, etc.
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
