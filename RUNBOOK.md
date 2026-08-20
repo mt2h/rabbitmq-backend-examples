@@ -58,19 +58,31 @@ python3 01_connect_and_queue.py
   conexión, y en una conexión nueva ese mensaje reaparece solo (redelivery).
   Es el mismo hueco que Celery `acks_late=True` deja abierto si un worker
   muere a mitad de una tarea.
-- [ ] **03 — `basic_qos(prefetch_count=N)`**: equivalente exacto de
-  `worker_prefetch_multiplier` de Celery. Con `prefetch_count=1` + ack tardío,
-  el consumer no recibe el siguiente mensaje hasta confirmar el anterior. Es
-  el corazón del "staircase" (`queued` baja de a N) que describe el README
-  del incidente.
+- [x] **03 — `03_qos_prefetch.py`**: `basic_qos(prefetch_count=N)`, equivalente
+  exacto de `worker_prefetch_multiplier` de Celery. Demo con dos consumers
+  (worker_lento 1s, worker_rapido 0.1s): sin `basic_qos` uno acapara los 10
+  mensajes si es el único suscrito al publicar; con `prefetch_count=1` en
+  ambos nadie acapara, pero el reparto no es 50/50 -- el más rápido termina
+  con la mayoría porque en lo que el lento suelta su único slot, el rápido ya
+  se comió el resto de la cola. Ojo con correr el script bajo debugger: si un
+  run anterior queda pausado (breakpoint/excepción) sin detener el proceso,
+  sus conexiones de pika siguen suscritas y compiten por los mensajes del
+  siguiente run -- hay que parar del todo la sesión de debug antes de
+  re-ejecutar.
 
 ### Bloque HTTP client (timeout, pool, circuit breaker)
 
-- [ ] **04 — Timeout bare-int vs `httpx.Timeout` partido**: script standalone
-  (sin RabbitMQ) contra un servidor propio que duerme N segundos. Comparar
-  `timeout=20` (aplica igual a connect/read/write/pool) vs
-  `httpx.Timeout(connect=, read=, write=, pool=)`. Ver que con bare-int no se
-  puede distinguir "el downstream tardó" de "esperé un slot libre del pool".
+- [x] **04 — `04_http_timeout.py`**: Timeout bare-int vs `httpx.Timeout`
+  partido. Script standalone (sin RabbitMQ) contra un servidor propio
+  (stdlib `ThreadingHTTPServer`, sin FastAPI) que duerme `SLEEP_SECONDS` y
+  responde 200. `httpx.Limits(max_connections=1)` a propósito para que dos
+  requests concurrentes compitan por el mismo slot. Escenario A
+  (`timeout=5` bare-int): req-2 espera el slot + su propia llamada (~6s
+  total) y termina OK, sin ningún error -- indistinguible de "el downstream
+  tardó más esta vez". Escenario B (`httpx.Timeout(connect=2, read=5,
+  write=5, pool=1)`, pool corto a propósito): req-2 falla rápido con
+  `PoolTimeout` explícito en ~1s en vez de esperar en silencio. Confirma el
+  finding de `_backup_original/README.md` (sección 3) con números propios.
 - [ ] **05 — `httpx.Limits` / pool exhaustion**: mismo downstream lento, pero
   con más requests concurrentes que `max_connections`. Ver el `PoolTimeout`
   real y cómo con timeout bare-int ese error se disfraza de timeout normal.

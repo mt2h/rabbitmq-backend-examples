@@ -73,7 +73,7 @@ Que vas a ver en la UI en cada paso (pestana Queues -> step2_queue):
       muerto con un mensaje unacked y lo re-encolo solo. Este es el
       momento clave: nadie "reenvio" nada, Rabbit lo hizo por su cuenta.
     - En ronda 2, apenas basic_consume arranca: Ready=0, Unacked=1
-      (mensaje-2, redeliverado -- fijate que la propiedad "redelivered"
+      (mensaje-2, redeliverado -- nota que la propiedad "redelivered"
       del mensaje viene en True si lo miras con Get messages en la UI).
     - Despues del ack final: Ready=0, Unacked=0, cola vacia.
 """
