@@ -83,12 +83,23 @@ python3 01_connect_and_queue.py
   write=5, pool=1)`, pool corto a propósito): req-2 falla rápido con
   `PoolTimeout` explícito en ~1s en vez de esperar en silencio. Confirma el
   finding de `_backup_original/README.md` (sección 3) con números propios.
-- [ ] **05 — `httpx.Limits` / pool exhaustion**: mismo downstream lento, pero
-  con más requests concurrentes que `max_connections`. Ver el `PoolTimeout`
-  real y cómo con timeout bare-int ese error se disfraza de timeout normal.
-  (Caveat honesto del README original: en Celery real esto casi no aplica
-  porque cada worker procesa 1 tarea a la vez — sigue valiendo la pena
-  entenderlo porque sí aplica a FastAPI/`asyncio.gather`.)
+- [x] **05 — `05_pool_exhaustion.py`**: mismo downstream lento y mismo patrón
+  de `04_http_timeout.py`, pero a escala real: `POOL_SIZE=3` conexiones y
+  `N_REQUESTS=12` concurrentes (`asyncio.gather`) → 4 "rondas" de 3 que se
+  turnan el pool. Escenario A (`timeout=5` bare-int): las rondas 1-3 (9
+  requests) esperan 0s/2s/4s por un slot, todo por debajo de 5s → OK; la
+  ronda 4 (3 requests) necesitaría esperar ~6s → supera los 5s y sale
+  `PoolTimeout` real y explícito, cortado justo a los 5s. El punto: ese
+  `PoolTimeout` queda marcado con el mismo número (5s) que cualquier lectura
+  lenta legítima, así que un log genérico de "timeout ~5s" no distingue
+  "no había conexiones libres" de "el downstream está lento de verdad".
+  Escenario B (`httpx.Timeout(pool=1, read=5, ...)`, pool corto a propósito):
+  solo la ronda 1 pasa; las rondas 2-4 (9 requests) fallan rápido a ~1s en
+  vez de ~2s/4s/6s — la magnitud de la falla ya delata agotamiento de pool,
+  sin tocar la paciencia dada a un downstream lento real. Caveat honesto del
+  README original (sección 3): en Celery real esto casi no aplica porque
+  cada worker procesa 1 tarea a la vez — sigue valiendo la pena entenderlo
+  porque sí aplica a FastAPI/`asyncio.gather`.
 - [ ] **06 — Circuit breaker**: mismo `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN,
   failure_threshold) contra un downstream que falla con 500. Comparar
   `failure_threshold=999999` (nunca abre, sigue masacrando al downstream) vs

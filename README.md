@@ -51,3 +51,21 @@ hace que req-2 falle rápido con `httpx.PoolTimeout` en vez de esperar a
 ciegas.
 
 ![Timeout bare-int vs. httpx.Timeout con pool separado](img/04_http_timeout.jpg)
+
+## 05_pool_exhaustion.py
+
+Mismo patrón que el paso 04, pero a escala real de agotamiento: un pool de 3
+conexiones (`max_connections=3`) contra 12 requests concurrentes, que se
+turnan en 4 rondas de 3. Escenario A (`timeout=5` bare-int): las rondas 1-3
+esperan 0s/2s/4s por un slot, todas por debajo de 5s, y terminan OK; la ronda
+4 necesitaría esperar ~6s, supera los 5s y sale `PoolTimeout` real — pero
+marcado con el mismo número (5s) que cualquier lectura lenta legítima, así
+que un log genérico de "timeout ~5s" no distingue "no había conexiones
+libres" de "el downstream está lento de verdad". Escenario B
+(`httpx.Timeout(pool=1, read=5, ...)`, pool corto a propósito): la ronda 1
+ocupa los 3 slots los 2s completos que tarda el downstream, así que ninguna
+de las rondas 2-4 llega a conseguir slot antes de que se les cumpla su
+presupuesto de 1s — los 9 caen en `PoolTimeout` casi al mismo tiempo (~1s),
+a una escala de tiempo muy distinta a la de un `read` lento real.
+
+![Agotamiento de pool: bare-int enmascara el PoolTimeout de la ronda 4 vs. pool corto que lo delata en las 3 rondas siguientes](img/05_pool_exhaustion.jpg)
