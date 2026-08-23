@@ -69,3 +69,18 @@ presupuesto de 1s — los 9 caen en `PoolTimeout` casi al mismo tiempo (~1s),
 a una escala de tiempo muy distinta a la de un `read` lento real.
 
 ![Agotamiento de pool: bare-int enmascara el PoolTimeout de la ronda 4 vs. pool corto que lo delata en las 3 rondas siguientes](img/05_pool_exhaustion.jpg)
+
+## 06_circuit_breaker.py
+
+Sigue standalone, sin RabbitMQ: una máquina de tres estados (`CLOSED` /
+`OPEN` / `HALF_OPEN`) contra un downstream propio que responde 500 al
+instante mientras está "enfermo". Sin retries/backoff a propósito, para
+aislar solo lo que hacen `can_execute()`/`on_success()`/`on_failure()`.
+Escenario A (`failure_threshold=999999`): los 10 requests tocan al
+downstream y fallan los 10 — el breaker nunca sale de `CLOSED`. Escenario B
+(`failure_threshold=3`): solo los primeros 3 tocan al downstream (y fallan)
+antes de que el breaker abra; los 7 restantes se cortan local, sin generar
+tráfico. Extra: tras `recovery_timeout`, con el downstream ya "sano", un
+request de prueba en `HALF_OPEN` tiene éxito y el breaker vuelve a `CLOSED`.
+
+![Diagrama de secuencia del circuit breaker: closed acumulando fallos, open cortando local, half-open probando y volviendo a closed](img/06_circuit_breaker.jpg)

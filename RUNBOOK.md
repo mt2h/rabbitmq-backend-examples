@@ -100,10 +100,17 @@ python3 01_connect_and_queue.py
   README original (sección 3): en Celery real esto casi no aplica porque
   cada worker procesa 1 tarea a la vez — sigue valiendo la pena entenderlo
   porque sí aplica a FastAPI/`asyncio.gather`.
-- [ ] **06 — Circuit breaker**: mismo `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN,
-  failure_threshold) contra un downstream que falla con 500. Comparar
-  `failure_threshold=999999` (nunca abre, sigue masacrando al downstream) vs
-  `failure_threshold=3` (abre y protege).
+- [x] **06 — `06_circuit_breaker.py`**: maquina de tres estados
+  (CLOSED/OPEN/HALF_OPEN) contra un downstream propio (stdlib) que responde
+  500 al instante mientras esta "enfermo". Sin retries/backoff a proposito
+  (eso es otro mecanismo, no se mezcla). Escenario A
+  (`failure_threshold=999999`): los 10 requests tocan al downstream y fallan
+  los 10 -- el breaker nunca sale de CLOSED. Escenario B
+  (`failure_threshold=3`): solo los primeros 3 tocan al downstream (y fallan)
+  antes de que el breaker abra; los 7 restantes se cortan local, sin generar
+  trafico. Extra: tras `recovery_timeout`, con el downstream ya "sano", un
+  request de prueba en HALF_OPEN tiene exito y el breaker vuelve a CLOSED --
+  cierra el ciclo de los tres estados.
 
 ### Bloque integración
 

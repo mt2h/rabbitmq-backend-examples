@@ -91,8 +91,11 @@ def main():
     #    implicito que enruta cada mensaje directo a la cola cuyo nombre
     #    coincide exactamente con routing_key. En realidad TODO publish pasa
     #    por un exchange (nunca se publica directo a una cola); usar "" es el
-    #    atajo para "sin exchange propio, entrega por nombre de cola". Cuando
-    #    veamos exchanges de verdad (fanout/direct/topic) dejaremos de usar "".
+    #    atajo para "sin exchange propio, entrega por nombre de cola". Es lo
+    #    mismo que usa el incidente real que reconstruimos (ver README de
+    #    `_backup_original`), asi que todos los scripts numerados se quedan
+    #    con "" -- no hay ningun paso planeado que use exchanges tipados
+    #    (fanout/direct/topic).
     mensaje = "hola desde step1"
     channel.basic_publish(exchange="", routing_key=QUEUE_NAME, body=mensaje)
     print(f"Mensaje publicado: {mensaje!r}")
