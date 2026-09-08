@@ -2,84 +2,10 @@
 Paso 3: basic_qos(prefetch_count=N) -- el limite de "cuantos mensajes sin
 confirmar puede tener un consumer a la vez".
 
-En 02 vimos que un mensaje entregado queda "unacked" hasta que se manda el
-ack. Lo que no vimos: por defecto RabbitMQ NO limita cuantos mensajes puede
-tener "unacked" un consumer al mismo tiempo. Sin limite, Rabbit empuja
-mensajes al consumer tan rapido como puede, sin importar si el consumer ya
-esta ocupado procesando el anterior -- se acumulan del lado del cliente,
-esperando a que el callback les llegue el turno.
-
-basic_qos(prefetch_count=N) le dice a Rabbit: "no le entregues a este
-consumer un mensaje nuevo si ya tiene N sin confirmar". Es el control de flujo
-que evita que un consumer se sature (o acapare trabajo que otro podria hacer
-mas rapido).
-
-Esto ES el mismo mecanismo que Celery usa: `worker_prefetch_multiplier`
-(por defecto 4) multiplicado por `--concurrency` define el prefetch_count
-real que Celery le pide a Rabbit. Por ejemplo, con el default (multiplier=4)
-y `--concurrency=2`, ese worker Celery le pide a Rabbit "dame maximo 8 tareas
-sin confirmar" -- el doble de tareas de las que en verdad puede procesar en
-paralelo (2), quedan 6 reservadas y esperando turno del lado del worker.
-Con multiplier=1 y concurrency=2, en cambio, cada worker Celery le dice a
-Rabbit "dame maximo 2 tareas sin confirmar" -- ni una mas, aunque haya 500
-esperando en la cola. Eso es EXACTAMENTE lo que probamos aqui con dos
-consumers propios (usando multiplier=1, o sea prefetch_count=1 por consumer).
-
-Diferencia con el semaphore que vamos a construir en el paso 07
-(WORKER_CONCURRENCY): prefetch_count lo hace cumplir RabbitMQ (a nivel de
-protocolo AMQP, controla cuantos mensajes le entrega al canal). El semaphore
-del paso 07 lo hace cumplir NUESTRO codigo de aplicacion (a nivel de cuantas
-llamadas HTTP concurrentes dejamos correr). En Celery real ambos coinciden:
-prefetch_count = worker_prefetch_multiplier * concurrency, asi que un worker
-nunca tiene mas mensajes reservados de los que puede llegar a procesar en
-paralelo.
-
-Demo (dos "workers" -- dos consumers con su propia conexion, cada uno en su
-propio hilo, sobre la MISMA cola):
-
-    worker_lento: tarda 1s en procesar cada mensaje (simula downstream lento).
-    worker_rapido: tarda 0.1s en procesar cada mensaje.
-
-Escenario 1 -- SIN limite (sin basic_qos, el default es ilimitado):
-    worker_lento se suscribe primero, solo. Publicamos 10 mensajes. Como es
-    el UNICO consumer en ese momento y no hay limite, Rabbit le entrega los
-    10 de una sola vez (quedan "unacked" del lado de worker_lento aunque
-    todavia no los haya procesado). Cuando worker_rapido se suscribe medio
-    segundo despues, la cola ya esta vacia -- no hay nada que darle. Resultado
-    esperado: worker_lento procesa los 10, worker_rapido procesa 0. Acaparo
-    todo el trabajo aunque worker_rapido lo hubiera hecho 10x mas rapido.
-
-Escenario 2 -- CON prefetch_count=1 en ambos:
-    Los dos se suscriben ANTES de publicar, cada uno con basic_qos(
-    prefetch_count=1). Publicamos los mismos 10 mensajes. Ahora Rabbit solo le
-    da 1 mensaje a la vez a cada uno; en cuanto uno ackea, le manda el
-    siguiente. Como worker_rapido ackea mucho mas rapido, termina procesando
-    la mayoria -- pero worker_lento SI alcanza a procesar varios (a diferencia
-    del escenario 1, donde se quedo en cero). El trabajo se reparte segun
-    quien puede de verdad, en vez de por quien llego primero.
-
 Como probar:
 
     docker compose up -d
     python3 03_qos_prefetch.py
-
-Host/puerto salen de RABBITMQ_HOST/RABBITMQ_PORT igual que en los pasos 01/02.
-
-Que vas a ver en la UI en cada escenario (pestana Queues -> step3_queue, y
-la pestana Connections/Channels para ver el detalle por canal):
-
-    - Escenario 1, justo despues de publicar (con solo worker_lento
-      suscrito): Ready=0, Unacked=10 -- TODOS entregados de una, aunque el
-      callback los vaya a procesar de a uno cada 1s. Si entras a la pestana
-      Channels y abres el canal de worker_lento, su "Prefetch count" saldra
-      en 0 (0 = ilimitado en la UI de RabbitMQ, no "cero mensajes").
-    - Escenario 1, cuando worker_rapido se suscribe: aparece un consumer mas
-      (consumers=2 en la cola) pero no le llega nada -- Ready sigue en 0.
-    - Escenario 2, justo despues de publicar (ambos ya suscritos con QoS 1):
-      Unacked se mantiene en 2 la mayor parte del tiempo (1 por worker), y
-      Ready va bajando de a poco segun se van confirmando -- un patron mucho
-      mas parejo que el "todo de una" del escenario 1. Si abres cada canal en
-      la pestana Channels, "Prefetch count" saldra en 1 para ambos.
 """
 
 import os

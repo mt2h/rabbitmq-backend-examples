@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repo is
 
 A step-by-step, no-black-boxes reconstruction of the mechanisms that
-`_backup_original/` combines to reproduce a real queue-congestion incident in
-`oz-zecore-connector-service` (see `_backup_original/README.md`). Each
+`_backup_original/` combines to reproduce a real queue-congestion incident
+(see `_backup_original/README.md`). Each
 top-level numbered script (`01_*.py`, `02_*.py`, ...) isolates exactly ONE
 concept. The full roadmap, current progress, and the exact demo/expected
 output for each step live in `RUNBOOK.md` — read it before adding or changing
@@ -49,7 +49,7 @@ To inspect AMQP traffic through mitmproxy, point the scripts at a reverse-TCP
 proxy instead of RabbitMQ directly (see "env var convention" below):
 
 ```bash
-mitmweb --mode reverse:tcp://127.0.0.1:5672 --listen-port 5673
+web --mode reverse:tcp://127.0.0.1:5672 --listen-port 5673
 # in another terminal:
 export RABBITMQ_PORT=5673
 python3 01_connect_and_queue.py
@@ -70,10 +70,13 @@ python3 01_connect_and_queue.py
   used from the thread that created it. Scripts that need multiple concurrent
   consumers (e.g. `03_qos_prefetch.py`) give each one its own connection in
   its own thread — follow that pattern for anything similar.
-- Each script's module docstring documents both the concepts it's isolating
-  and the exact RabbitMQ management-UI state to expect at each step — treat
-  that docstring as living documentation, keep it in sync when editing the
-  script's behavior.
+- Each script's module docstring is intentionally short: 1-2 sentences naming
+  the concept plus the exact `Como probar:` command. The concept walkthrough,
+  scenario-by-scenario explanation, and the exact RabbitMQ management-UI /
+  stdout state to expect at each step live in `onboarding/index.html` (an
+  interactive step-by-step page covering steps 01-07) and in `RUNBOOK.md`'s
+  per-step bullets — keep those two in sync when editing a script's behavior,
+  not the docstring.
 
 ## Working in this repo
 

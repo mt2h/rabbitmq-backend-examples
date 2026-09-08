@@ -1,0 +1,2573 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ backend examples &middot; Onboarding</title>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --bg-panel: #ffffff;
+    --bg-sidebar: #ffffff;
+    --text: #1c1c1e;
+    --text-dim: #5b5b60;
+    --border: #e3e2df;
+    --accent: #ff6600;
+    --accent-soft: #fff1e6;
+    --accent-http: #2563eb;
+    --accent-http-soft: #eaf1ff;
+    --accent-res: #7c3aed;
+    --accent-res-soft: #f3ecff;
+    --accent-int: #15803d;
+    --accent-int-soft: #eafaf0;
+    --code-bg: #1e1e1e;
+    --good: #1f9d55;
+    --bad: #d33d2c;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121214;
+      --bg-panel: #1a1a1d;
+      --bg-sidebar: #17171a;
+      --text: #eceeec;
+      --text-dim: #a3a3a8;
+      --border: #2b2b2f;
+      --accent: #ff8c3f;
+      --accent-soft: #2c1c0f;
+      --accent-http: #5b9bff;
+      --accent-http-soft: #142238;
+      --accent-res: #a879f5;
+      --accent-res-soft: #241a34;
+      --accent-int: #4ade80;
+      --accent-int-soft: #12291b;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121214;
+    --bg-panel: #1a1a1d;
+    --bg-sidebar: #17171a;
+    --text: #eceeec;
+    --text-dim: #a3a3a8;
+    --border: #2b2b2f;
+    --accent: #ff8c3f;
+    --accent-soft: #2c1c0f;
+    --accent-http: #5b9bff;
+    --accent-http-soft: #142238;
+    --accent-res: #a879f5;
+    --accent-res-soft: #241a34;
+    --accent-int: #4ade80;
+    --accent-int-soft: #12291b;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  .app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 20px 14px;
+    overflow-y: auto;
+  }
+  .brand { padding: 4px 10px 18px; }
+  .brand-title { font-weight: 700; font-size: 15px; letter-spacing: .2px; }
+  .brand-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+  .side-list { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .side-item {
+    display: flex; align-items: center; gap: 10px;
+    text-align: left; width: 100%;
+    background: transparent; border: none; cursor: pointer;
+    padding: 9px 10px; border-radius: 10px;
+    color: var(--text); font: inherit;
+  }
+  .side-item:hover { background: var(--accent-soft); }
+  .side-item.active { background: var(--accent-soft); }
+  .side-item.active .side-num { background: var(--accent); color: #fff; }
+  .side-num {
+    flex: 0 0 30px; height: 26px; border-radius: 7px;
+    background: var(--border); color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .side-text { display: flex; flex-direction: column; min-width: 0; }
+  .side-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-kicker { font-size: 11px; color: var(--text-dim); }
+
+  .sidebar-foot { padding: 10px; border-top: 1px solid var(--border); margin-top: 10px; }
+  .progress-track { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .25s ease; }
+  .progress-text { font-size: 11.5px; color: var(--text-dim); margin-top: 6px; }
+
+  /* ---------- Main ---------- */
+  .main { display: flex; flex-direction: column; min-height: 100vh; }
+  .stage { flex: 1; padding: 40px clamp(20px, 5vw, 64px) 120px; max-width: 900px; }
+
+  .panel { display: none; animation: fade .3s ease; }
+  .panel.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .kicker {
+    display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--accent);
+    background: var(--accent-soft); padding: 4px 10px; border-radius: 999px;
+    margin: 0 0 14px;
+  }
+  #panel-04 .kicker, #panel-05 .kicker { color: var(--accent-http); background: var(--accent-http-soft); }
+  #panel-06 .kicker { color: var(--accent-res); background: var(--accent-res-soft); }
+  #panel-07 .kicker { color: var(--accent-int); background: var(--accent-int-soft); }
+
+  .panel-head h2 { font-size: clamp(24px, 3vw, 32px); margin: 0 0 10px; line-height: 1.2; }
+  .tagline { font-size: 17px; color: var(--text-dim); margin: 0 0 18px; max-width: 62ch; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chip {
+    font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg-panel); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 7px; color: var(--text-dim);
+  }
+
+  .section-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--text-dim); margin: 34px 0 10px;
+  }
+
+  /* ---------- Instrucciones (síntesis del docstring) ---------- */
+  .instructions-wrap {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .instr-lead { font-size: 15px; line-height: 1.6; font-style: italic; color: var(--text); margin: 0 0 12px; }
+  .instr-lead:last-child { margin-bottom: 0; }
+  .instr-lead code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-style: normal;
+    background: var(--bg); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; font-size: .9em;
+  }
+  .instr-code {
+    background: var(--code-bg); color: #d9d9d9; border-radius: 8px; padding: 12px 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.8px;
+    line-height: 1.6; overflow-x: auto; margin: 0; white-space: pre-wrap;
+  }
+
+  /* ---------- Diagram ---------- */
+  .diagram-wrap {
+    margin: 26px 0; background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px; box-shadow: var(--shadow);
+  }
+  .diag { width: 100%; height: auto; display: block; }
+  .diag-box { fill: var(--bg); stroke: var(--border); stroke-width: 1.6; }
+  .diag-box-accent { stroke: var(--accent); }
+  #panel-04 .diag-box-accent, #panel-05 .diag-box-accent { stroke: var(--accent-http); }
+  #panel-07 .diag-box-accent { stroke: var(--accent-int); }
+  .diag-text { font: 700 14px -apple-system, sans-serif; fill: var(--text); text-anchor: middle; }
+  .diag-sub { font: 11.5px -apple-system, sans-serif; fill: var(--text-dim); text-anchor: middle; }
+  .diag-arrow { fill: none; stroke: var(--text-dim); stroke-width: 1.8; }
+  .diag-arrow-dashed { stroke-dasharray: 4 3; }
+  .diag-arrow-label { font: 11.5px -apple-system, sans-serif; fill: var(--text-dim); }
+  .diag-arrowhead { fill: var(--text-dim); }
+
+  .fsm-node { fill: var(--bg-panel); stroke-width: 3; }
+  .fsm-closed { stroke: var(--good); }
+  .fsm-open { stroke: var(--bad); }
+  .fsm-half { stroke: #d8a418; }
+  .fsm-label { font: 700 22px ui-monospace, monospace; fill: var(--text); text-anchor: middle; }
+  .fsm-sub { font: 12px sans-serif; fill: var(--text-dim); text-anchor: middle; }
+  .diag-arrow-fail { stroke: var(--bad); }
+  .result-ok { fill: color-mix(in srgb, var(--good) 16%, transparent); stroke: var(--good); stroke-width: 1.6; }
+  .result-fail { fill: color-mix(in srgb, var(--bad) 16%, transparent); stroke: var(--bad); stroke-width: 1.6; }
+  .result-text { font: 700 12px ui-monospace, monospace; fill: var(--text); }
+
+  .callout {
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 14px 18px; margin: 22px 0;
+  }
+  #panel-04 .callout, #panel-05 .callout { background: var(--accent-http-soft); border-left-color: var(--accent-http); border-color: color-mix(in srgb, var(--accent-http) 30%, transparent); }
+  #panel-06 .callout { background: var(--accent-res-soft); border-left-color: var(--accent-res); border-color: color-mix(in srgb, var(--accent-res) 30%, transparent); }
+  #panel-07 .callout { background: var(--accent-int-soft); border-left-color: var(--accent-int); border-color: color-mix(in srgb, var(--accent-int) 30%, transparent); }
+  .callout-title { font-weight: 700; margin: 0 0 4px; font-size: 14.5px; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .prose { font-size: 15.5px; line-height: 1.7; }
+  .prose p { margin: 0 0 16px; }
+  .prose ul { margin: 0 0 16px; padding-left: 22px; }
+  .prose li { margin-bottom: 8px; }
+  .prose blockquote {
+    margin: 0 0 16px; padding: 10px 16px; border-left: 3px solid var(--border);
+    color: var(--text-dim); font-style: italic;
+  }
+  .prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg-panel); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 5px; font-size: .9em;
+  }
+  .prose strong { font-weight: 700; }
+  .muted { color: var(--text-dim); font-size: 14px; }
+
+  .phase-table { width: 100%; border-collapse: collapse; margin: 4px 0 20px; font-size: 14px; }
+  .phase-table th, .phase-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .phase-table th { color: var(--text-dim); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+  .phase-table code { white-space: nowrap; }
+
+  /* ---------- Outputs stepper ---------- */
+  .outputs-section { margin-top: 8px; }
+  .outsteps {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .outstep { display: none; padding: 22px 22px 6px; }
+  .outstep.active { display: block; animation: fade .2s ease; }
+  .outbadges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .badge {
+    font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--accent-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    padding: 3px 9px; border-radius: 999px;
+  }
+  #panel-04 .badge, #panel-05 .badge { background: var(--accent-http-soft); border-color: color-mix(in srgb, var(--accent-http) 25%, transparent); }
+  #panel-06 .badge { background: var(--accent-res-soft); border-color: color-mix(in srgb, var(--accent-res) 25%, transparent); }
+  #panel-07 .badge { background: var(--accent-int-soft); border-color: color-mix(in srgb, var(--accent-int) 25%, transparent); }
+  .badge b { font-weight: 700; }
+  .outterm {
+    background: var(--code-bg); color: #d9d9d9; border-radius: 10px; padding: 14px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+    line-height: 1.6; overflow-x: auto; margin: 0 0 14px; white-space: pre-wrap;
+  }
+  .outnote { font-size: 14.5px; line-height: 1.65; color: var(--text-dim); margin: 0 0 20px; }
+  .outnote code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; font-size: .92em; color: var(--text); }
+  .outnav {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 18px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 60%, transparent);
+  }
+  .outbtn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .outbtn:disabled { opacity: .35; cursor: default; }
+  .outbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #panel-04 .outbtn.primary, #panel-05 .outbtn.primary { background: var(--accent-http); border-color: var(--accent-http); }
+  #panel-06 .outbtn.primary { background: var(--accent-res); border-color: var(--accent-res); }
+  #panel-07 .outbtn.primary { background: var(--accent-int); border-color: var(--accent-int); }
+  .outdots { display: flex; gap: 6px; }
+  .outdot { width: 8px; height: 8px; border-radius: 50%; border: none; background: var(--border); cursor: pointer; padding: 0; }
+  .outdot.active { background: var(--accent); }
+  #panel-04 .outdot.active, #panel-05 .outdot.active { background: var(--accent-http); }
+  #panel-06 .outdot.active { background: var(--accent-res); }
+  #panel-07 .outdot.active { background: var(--accent-int); }
+  .outcount { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  details.code-details {
+    margin-top: 30px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--bg-panel); overflow: hidden;
+  }
+  details.code-details summary {
+    cursor: pointer; padding: 14px 18px; font-size: 13.5px; font-weight: 600;
+    color: var(--text-dim); list-style: none; display: flex; align-items: center; gap: 8px;
+  }
+  details.code-details summary::before {
+    content: "▸"; display: inline-block; transition: transform .15s ease; color: var(--accent);
+  }
+  details.code-details[open] summary::before { transform: rotate(90deg); }
+  details.code-details summary code { background: none; border: none; padding: 0; color: inherit; }
+  pre.code-block { margin: 0; padding: 0; max-height: 640px; overflow: auto; }
+  pre.code-block code {
+    display: block; padding: 18px; font-size: 12.6px; line-height: 1.6;
+    background: var(--code-bg) !important;
+  }
+
+  /* ---------- Bottom nav ---------- */
+  .navbar {
+    position: sticky; bottom: 0; z-index: 5;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+    padding: 12px clamp(20px, 5vw, 64px);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .nav-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg-panel); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600;
+    cursor: pointer;
+  }
+  .nav-btn:disabled { opacity: .35; cursor: default; }
+  .nav-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .nav-center { font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      position: static; height: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden;
+      border-right: none; border-bottom: 1px solid var(--border); padding: 12px;
+    }
+    .brand, .sidebar-foot { display: none; }
+    .side-list { flex-direction: row; }
+    .side-item { flex: 0 0 auto; }
+    .side-text { display: none; }
+    .stage { padding: 24px 18px 110px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" aria-label="Pasos">
+    <div class="brand">
+      <div class="brand-title">RabbitMQ backend examples</div>
+      <div class="brand-sub">Onboarding &middot; 9 paneles</div>
+    </div>
+    <div class="side-list" role="tablist">
+<button class="side-item" data-goto="0" id="tab-intro" role="tab"><span class="side-num">·</span><span class="side-text"><span class="side-title">Por qué este proyecto</span><span class="side-kicker">Intro</span></span></button>
+<button class="side-item" data-goto="1" id="tab-01" role="tab">
+      <span class="side-num">01</span>
+      <span class="side-text">
+        <span class="side-title">Connection, Channel, Queue</span>
+        <span class="side-kicker">RabbitMQ · fundamentos</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="2" id="tab-02" role="tab">
+      <span class="side-num">02</span>
+      <span class="side-text">
+        <span class="side-title">basic_consume + ack manual</span>
+        <span class="side-kicker">RabbitMQ · entrega y confirmación</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="3" id="tab-03" role="tab">
+      <span class="side-num">03</span>
+      <span class="side-text">
+        <span class="side-title">basic_qos(prefetch_count=N)</span>
+        <span class="side-kicker">RabbitMQ · control de flujo</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="4" id="tab-04" role="tab">
+      <span class="side-num">04</span>
+      <span class="side-text">
+        <span class="side-title">Timeout bare-int vs httpx.Timeout partido</span>
+        <span class="side-kicker">Cliente HTTP · timeouts</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="5" id="tab-05" role="tab">
+      <span class="side-num">05</span>
+      <span class="side-text">
+        <span class="side-title">Agotamiento real de pool, en rondas</span>
+        <span class="side-kicker">Cliente HTTP · a escala</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="6" id="tab-06" role="tab">
+      <span class="side-num">06</span>
+      <span class="side-text">
+        <span class="side-title">Circuit breaker: CLOSED / OPEN / HALF_OPEN</span>
+        <span class="side-kicker">Resiliencia</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="7" id="tab-07" role="tab">
+      <span class="side-num">07</span>
+      <span class="side-text">
+        <span class="side-title">Worker slots (semaphore) + prefetch + HTTP lento</span>
+        <span class="side-kicker">Integración</span>
+      </span>
+    </button>
+<button class="side-item" data-goto="8" id="tab-roadmap" role="tab"><span class="side-num">✓</span><span class="side-text"><span class="side-title">Cierre</span><span class="side-kicker">Resumen</span></span></button>
+    </div>
+    <div class="sidebar-foot">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText"></div>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="stage" id="stage">
+
+    <section class="panel" id="panel-intro" data-index="0" role="tabpanel" aria-labelledby="tab-intro">
+      <div class="panel-head">
+        <p class="kicker">Onboarding</p>
+        <h2>Backpressure, sin cajas negras</h2>
+        <p class="tagline">Reconstruyendo, pieza por pieza, los mecanismos detrás de un incidente típico de congestión de colas.</p>
+      </div>
+      <div class="prose">
+<p>Este proyecto reconstruye, pieza por pieza y <strong>sin cajas negras</strong>, los mecanismos
+que cualquier backend con una cola de mensajes, un cliente HTTP y un pool de workers puede combinar
+para terminar en un incidente de congestión de colas. En vez de levantar un stack completo (una API,
+una base de datos, un worker asíncrono, un downstream lento) y ver el síntoma final sin entender el
+porqué, cada script numerado aísla <strong>un solo concepto</strong> con RabbitMQ y Python puro, y lo
+prueba con una demo reproducible y con asserts.</p>
+<p>La idea de "avanzar de a uno" no es solo de presentación: es literalmente cómo está diseñado el
+código. <code>01</code> y <code>02</code> establecen cómo RabbitMQ entrega y confirma mensajes.
+<code>03</code> le pone un límite a cuánto puede acaparar un consumer. Ahí el proyecto se despega
+de RabbitMQ por completo y se mete al cliente HTTP: <code>04</code> y <code>05</code> muestran cómo
+un timeout mal configurado disfraza el agotamiento de un pool de conexiones como si fuera "el
+downstream que tardó". <code>06</code> agrega la pieza de resiliencia que corta el tráfico hacia un
+downstream que ya se sabe que está caído. El paso <code>07</code> es donde todo esto se junta:
+un semáforo de aplicación ocupando un "slot" mientras un consumer de RabbitMQ llama al cliente HTTP
+lento — el mecanismo completo de "queued sube, in_flight tope en N", el patrón detrás de la mayoría
+de las congestiones de cola en producción, sin importar el nombre del servicio en el que aparezcan.</p>
+<p>Cada tarjeta trae el diagrama del mecanismo, la <strong>salida real del script paso a paso</strong>
+(revelada de a poco, con el estado relevante junto a cada línea) y el código completo como
+referencia — y una explicación que profundiza más allá del docstring, conectando cada mecanismo con
+su equivalente en Celery/producción y con el resto de los pasos.</p>
+</div>
+
+<p class="section-label">Infraestructura</p>
+<div class="instructions-wrap">
+  <p class="instr-lead">Un solo servicio en contenedor para todo el proyecto: RabbitMQ 3 con el plugin de management.</p>
+</div>
+<details class="code-details">
+  <summary>Ver <code>docker-compose.yml</code> completo (9 líneas)</summary>
+  <pre class="code-block"><code class="language-yaml">services:
+  # RabbitMQ con el plugin de management activado.
+  # - 5672: puerto AMQP, el que usan las apps (y nuestro script) para conectarse.
+  # - 15672: interfaz web para ver colas, mensajes, conexiones, etc.
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - &quot;5672:5672&quot;
+      - &quot;15672:15672&quot;
+</code></pre>
+</details>
+
+<div class="prose">
+<p class="muted">Usa las flechas ← → del teclado, los botones de abajo, o la lista de la izquierda
+para moverte entre pasos. Dentro de cada paso, la sección "Salida paso a paso" tiene su propia
+navegación — avanza a tu ritmo por la demo real.</p>
+</div>
+    </section>
+    
+
+    <section class="panel" id="panel-01" data-index="1" role="tabpanel" aria-labelledby="tab-01">
+      <div class="panel-head">
+        <p class="kicker">RabbitMQ · fundamentos</p>
+        <h2>Paso 1 &middot; Connection, Channel, Queue</h2>
+        <p class="tagline">El viaje redondo más simple: publicar un mensaje y sacarlo de vuelta.</p>
+        <div class="chips"><span class="chip">Connection</span><span class="chip">Channel</span><span class="chip">Queue</span><span class="chip">basic_publish</span><span class="chip">basic_get(auto_ack=True)</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 730 180" class="diag" role="img" aria-label="Connection, Channel y Queue"><defs><marker id="arrow-01" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="60" width="160" height="65" rx="12" class="diag-box"/><text x="100.0" y="86" class="diag-text">Script Python</text><text x="100.0" y="106" class="diag-sub">pika.BlockingConnection</text><rect x="290" y="15" width="180" height="145" rx="12" class="diag-box diag-box-accent"/><text x="380.0" y="39" class="diag-text">Connection</text><text x="380.0" y="56" class="diag-sub">TCP :5672</text><rect x="315" y="90" width="130" height="50" rx="12" class="diag-box"/><text x="380.0" y="119" class="diag-text">Channel</text><rect x="560" y="60" width="150" height="65" rx="12" class="diag-box"/><text x="635.0" y="86" class="diag-text">step1_queue</text><text x="635.0" y="106" class="diag-sub">Ready: 0 → 1 → 0</text><path d="M180,92 L290,92" class="diag-arrow" marker-end="url(#arrow-01)"/><text x="235" y="77" class="diag-arrow-label" text-anchor="middle">abre conexión</text><path d="M470,80 L560,80" class="diag-arrow" marker-end="url(#arrow-01)"/><text x="515" y="70" class="diag-arrow-label" text-anchor="middle">basic_publish</text><path d="M560,112 L470,112" class="diag-arrow" marker-end="url(#arrow-01)"/><text x="515" y="133" class="diag-arrow-label" text-anchor="middle">basic_get</text></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">Por qué importa más adelante</p>
+        <p>Nada todavía directamente — pero cada mecanismo de congestión que se arma en
+            los pasos siguientes (prefetch, acks, pool HTTP, circuit breaker) se apoya sobre esta base:
+            una Connection pesada que se abre una vez, un Channel liviano que se usa para todo, y una
+            Queue que es solo un buffer con reglas de entrega configurables.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>Este paso no resuelve ningún problema del incidente todavía — establece el vocabulario
+        que todos los pasos siguientes dan por sentado. Vale la pena quedarse un momento en las
+        tres capas del modelo AMQP 0-9-1, porque cada una tiene un costo y un ciclo de vida distinto:</p>
+        <ul>
+          <li><strong>Connection</strong> es una conexión TCP real, con handshake y autenticación.
+          Es <em>cara</em> de abrir (decenas de milisegundos, a veces más si hay TLS) y por eso
+          en producción casi nunca se abre una por mensaje: se abre una vez por proceso worker y
+          se reutiliza.</li>
+          <li><strong>Channel</strong> es un canal lógico multiplexado dentro de esa misma conexión
+          TCP — el mismo truco que streams en HTTP/2: muchas operaciones concurrentes, un solo
+          socket. Es barato de abrir/cerrar comparado con una Connection, pero no es gratis ni
+          thread-safe (ver la nota de <code>pika</code> más abajo).</li>
+          <li><strong>Queue</strong> es el buffer real de mensajes. <code>queue_declare</code> es
+          idempotente — declarar dos veces la misma cola con la misma configuración no hace nada —
+          pero ojo: si no se pasa <code>durable=True</code> (como en este script, a propósito, para
+          no complicar el primer paso), la cola vive solo en memoria y desaparece si RabbitMQ se
+          reinicia.</li>
+        </ul>
+        <p>El otro detalle fácil de pasar por alto: <strong>nunca se publica "directo a una cola"</strong>.
+        Todo <code>basic_publish</code> pasa por un <em>exchange</em>, que decide a qué cola(s) va el
+        mensaje según su <em>routing key</em>. <code>exchange=""</code> es el <em>default exchange</em>,
+        un exchange implícito de tipo <code>direct</code> que RabbitMQ pre-enlaza automáticamente a
+        cada cola declarada, usando el nombre de la cola como routing key. Es el atajo que usa este
+        repo entero (ningún paso planeado usa exchanges tipados fanout/direct/topic propios).</p>
+        <p>Por último, la diferencia entre <code>basic_get</code> (este paso) y <code>basic_consume</code>
+        (paso 02) es la diferencia entre <em>pull</em> y <em>push</em>: <code>basic_get</code> es "dame
+        un mensaje si hay, ahora, sin bloquear" — útil para scripts y debugging, pero nadie construye
+        un worker real sobre <code>basic_get</code> en un loop porque desperdicia round-trips. Los
+        consumers de verdad (incluido Celery/kombu por debajo) usan <code>basic_consume</code>.</p>
+        
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 1: lo minimo indispensable para hablar con RabbitMQ.</p>
+        <pre class="instr-code">docker compose up -d
+pip install -r requirements.txt
+python3 01_connect_and_queue.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>01_connect_and_queue.py</code> completo (69 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import os
+
+import pika
+
+QUEUE_NAME = &quot;step1_queue&quot;
+
+# Host/puerto configurables por variable de entorno para poder meter un
+# proxy en medio (p.ej. mitmproxy) sin tocar el codigo.
+RABBITMQ_HOST = os.environ.get(&quot;RABBITMQ_HOST&quot;, &quot;localhost&quot;)
+RABBITMQ_PORT = int(os.environ.get(&quot;RABBITMQ_PORT&quot;, &quot;5672&quot;))
+
+
+def main():
+    # 1. Abrir la connection (TCP + login) contra el RabbitMQ que levantamos
+    #    con docker-compose. guest/guest son las credenciales por defecto de
+    #    la imagen oficial, validas solo para conexiones locales.
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT)
+    )
+    print(f&quot;Conexion abierta ({RABBITMQ_HOST}:{RABBITMQ_PORT}).&quot;)
+
+    # 2. Abrir un channel sobre esa connection.
+    channel = connection.channel()
+    print(&quot;Channel abierto.&quot;)
+
+    # 3. Declarar la cola (crearla si no existe).
+    channel.queue_declare(queue=QUEUE_NAME)
+    print(f&quot;Cola &#x27;{QUEUE_NAME}&#x27; declarada.&quot;)
+
+    # 4. Publicar un mensaje de prueba.
+    #    exchange=&quot;&quot; es el &quot;default exchange&quot; de RabbitMQ: un exchange
+    #    implicito que enruta cada mensaje directo a la cola cuyo nombre
+    #    coincide exactamente con routing_key. En realidad TODO publish pasa
+    #    por un exchange (nunca se publica directo a una cola); usar &quot;&quot; es el
+    #    atajo para &quot;sin exchange propio, entrega por nombre de cola&quot;. Es lo
+    #    mismo que usa el incidente real que reconstruimos (ver README de
+    #    `_backup_original`), asi que todos los scripts numerados se quedan
+    #    con &quot;&quot; -- no hay ningun paso planeado que use exchanges tipados
+    #    (fanout/direct/topic).
+    mensaje = &quot;hola desde step1&quot;
+    channel.basic_publish(exchange=&quot;&quot;, routing_key=QUEUE_NAME, body=mensaje)
+    print(f&quot;Mensaje publicado: {mensaje!r}&quot;)
+
+    # 5. Consumirlo de vuelta (basic_get = &quot;dame un mensaje si hay, sin
+    #    bloquear esperando&quot;; distinto de basic_consume, que veremos despues).
+    method_frame, header_frame, body = channel.basic_get(
+        # auto_ack=True: apenas RabbitMQ nos entrega el mensaje lo da por
+        # confirmado (ack) automaticamente y lo borra de la cola. Con
+        # auto_ack=False el mensaje queda &quot;entregado pero no confirmado&quot;: si
+        # el consumidor se cae antes de mandar el ack explicito (channel.
+        # basic_ack), RabbitMQ lo vuelve a poner en la cola para reintentar.
+        # Aqui usamos True porque este script no hace nada que pueda fallar
+        # entre recibir y procesar; el manejo real de acks (y sus riesgos:
+        # duplicados, mensajes perdidos) lo vemos mas adelante.
+        queue=QUEUE_NAME, auto_ack=True
+    )
+    if method_frame:
+        print(f&quot;Mensaje recibido de vuelta: {body.decode()!r}&quot;)
+    else:
+        print(&quot;No habia ningun mensaje en la cola (raro, algo fallo).&quot;)
+
+    # 6. Cerrar prolijo.
+    connection.close()
+    print(&quot;Conexion cerrada.&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+      
+
+      
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>0</b></span><span class="badge">Consumers: <b>0</b></span></div>
+          <pre class="outterm">Conexion abierta (localhost:5672).
+Channel abierto.</pre>
+          <p class="outnote">La Connection y el Channel se abren antes de tocar la cola. Todavía no existe ningún mensaje ni ninguna cola declarada — nada que ver en la UI todavía.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>0</b></span></div>
+          <pre class="outterm">Cola &#x27;step1_queue&#x27; declarada.</pre>
+          <p class="outnote"><code>queue_declare()</code> es idempotente: si la cola no existía la crea; si ya existía con la misma config, no hace nada. En la UI aparece con Ready=0, Unacked=0, consumers=0.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>1</b></span><span class="badge">Unacked: <b>0</b></span></div>
+          <pre class="outterm">Mensaje publicado: &#x27;hola desde step1&#x27;</pre>
+          <p class="outnote"><code>basic_publish()</code> deja el mensaje sentado en la cola. Nadie lo ha tocado todavía — Ready sube a 1.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>0</b></span></div>
+          <pre class="outterm">Mensaje recibido de vuelta: &#x27;hola desde step1&#x27;</pre>
+          <p class="outnote"><code>basic_get(auto_ack=True)</code> entrega y confirma en el mismo instante — a diferencia de <code>auto_ack=False</code> (paso 02), no hay ninguna ventana donde el mensaje quede "Unacked". Ready vuelve a 0 directo.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">Conexion cerrada.</pre>
+          <p class="outnote">Cierre prolijo. <code>step1_queue</code> queda vacía y declarada, lista para el próximo run.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-02" data-index="2" role="tabpanel" aria-labelledby="tab-02">
+      <div class="panel-head">
+        <p class="kicker">RabbitMQ · entrega y confirmación</p>
+        <h2>Paso 2 &middot; basic_consume + ack manual</h2>
+        <p class="tagline">«Entregado» y «confirmado» son dos momentos distintos — y esa brecha es donde vive Celery acks_late.</p>
+        <div class="chips"><span class="chip">basic_consume (push)</span><span class="chip">auto_ack=False</span><span class="chip">basic_ack</span><span class="chip">redelivery</span><span class="chip">at-least-once</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 730 210" class="diag fsm" role="img" aria-label="Ciclo de vida de un mensaje: Ready, Unacked, ack o redelivery"><defs><marker id="arrow-02" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><circle cx="130" cy="100" r="66" class="fsm-node fsm-closed"/><text x="130" y="97" class="fsm-label" font-size="16">Ready</text><text x="130" y="116" class="fsm-sub">en la cola</text><circle cx="400" cy="100" r="66" class="fsm-node fsm-half"/><text x="400" y="93" class="fsm-label" font-size="15">Unacked</text><text x="400" y="111" class="fsm-sub">entregado, sin</text><text x="400" y="124" class="fsm-sub">confirmar</text><circle cx="640" cy="45" r="52" class="fsm-node fsm-closed"/><text x="640" y="41" class="fsm-label" font-size="13">borrado</text><text x="640" y="57" class="fsm-sub">(ack)</text><path d="M196,95 L334,95" class="diag-arrow" marker-end="url(#arrow-02)"/><text x="265" y="85" class="diag-arrow-label" text-anchor="middle">entrega (push)</text><path d="M452,80 L596,55" class="diag-arrow" marker-end="url(#arrow-02)"/><text x="524" y="45" class="diag-arrow-label" text-anchor="middle">basic_ack</text><path d="M370,160 L175,145" class="diag-arrow" marker-end="url(#arrow-02)"/><text x="272" y="185" class="diag-arrow-label" text-anchor="middle">canal muere sin ack</text></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">El hueco que deja acks_late</p>
+        <p>"mensaje-2" en la demo simula un worker que revienta después de recibir el
+            trabajo pero antes de confirmarlo. Nadie reenvía nada explícitamente: RabbitMQ detecta el
+            canal muerto con un mensaje unacked colgando y lo re-encola por su cuenta. Este es
+            precisamente el mecanismo detrás de duplicados en sistemas con retries — y la razón por
+            la que "procesar dos veces" tiene que ser seguro.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>La idea central de este paso es una sola distinción, pero es la que sostiene todo el
+        modelo de confiabilidad de RabbitMQ:</p>
+        <blockquote>entregado (delivered) ≠ confirmado (acked)</blockquote>
+        <p>Con <code>auto_ack=False</code>, en cuanto <code>on_message</code> se dispara el mensaje
+        ya se marcó "unacked" — sigue existiendo en el servidor, ligado a <em>ese canal específico</em>,
+        pero ya no cuenta como "listo para entregar" a otro consumer. Desde ahí hay exactamente tres
+        finales posibles:</p>
+        <ul>
+          <li><code>basic_ack</code> → borrado permanente. El contrato se cumplió.</li>
+          <li><code>basic_nack(requeue=True)</code> → vuelve a la cola de inmediato, disponible para
+          cualquier consumer (incluido el mismo).</li>
+          <li>el canal o la conexión se cierran <strong>sin</strong> haber mandado ack (crash,
+          <code>kill -9</code>, excepción no capturada que tumba el proceso) → RabbitMQ lo detecta
+          y lo redelivera solo, sin que nadie se lo pida.</li>
+        </ul>
+        <p>Ese tercer caso es, con otras palabras, exactamente lo que Celery implementa con
+        <code>task_acks_late=True</code>: si el worker muere a mitad de una tarea, la tarea nunca
+        se dio por completada y Rabbit la vuelve a poner en juego. Es una garantía
+        <strong>at-least-once</strong> (al menos una vez), y viene con un precio: si el worker
+        murió <em>después</em> de terminar el trabajo real pero <em>antes</em> de que el ack saliera
+        por la red, esa tarea se reprocesa. Por eso cualquier tarea con <code>acks_late=True</code>
+        tiene que ser <strong>idempotente</strong> si el efecto secundario importa — no es un detalle
+        opcional, es la contraparte obligatoria de la garantía at-least-once.</p>
+        <p>El otro cambio de este paso, <code>basic_get</code> → <code>basic_consume</code>, no es
+        cosmético: <code>basic_consume</code> no bloquea ni consume nada por sí solo, solo
+        <em>suscribe</em> el canal. <code>start_consuming()</code> es la que de verdad entra a un
+        loop bloqueante leyendo frames del socket — el mismo patrón que corre cualquier worker real
+        en producción: nunca sabe cuántos mensajes van a llegar, solo se queda escuchando
+        indefinidamente hasta que algo externo lo detenga.</p>
+        
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 2: basic_consume + ack manual.</p>
+        <pre class="instr-code">docker compose up -d
+python3 02_basic_consume_ack.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>02_basic_consume_ack.py</code> completo (131 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import os
+
+import pika
+
+QUEUE_NAME = &quot;step2_queue&quot;
+
+RABBITMQ_HOST = os.environ.get(&quot;RABBITMQ_HOST&quot;, &quot;localhost&quot;)
+RABBITMQ_PORT = int(os.environ.get(&quot;RABBITMQ_PORT&quot;, &quot;5672&quot;))
+
+
+def connect():
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT)
+    )
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME)
+    return connection, channel
+
+
+def ronda_1():
+    print(&quot;=== Ronda 1: publicar 3, ackear 2, dejar 1 sin ack a proposito ===&quot;)
+    connection, channel = connect()
+
+    for i in range(1, 4):
+        channel.basic_publish(exchange=&quot;&quot;, routing_key=QUEUE_NAME, body=f&quot;mensaje-{i}&quot;)
+    print(&quot;3 mensajes publicados.&quot;)
+
+    procesados = []
+
+    # Este callback lo invoca pika UNA VEZ POR MENSAJE, no una sola vez con
+    # los 3 juntos. Cada mensaje que RabbitMQ empuja dispara su propia
+    # llamada a on_message, en orden (primero mensaje-1, luego mensaje-2,
+    # luego mensaje-3).
+    def on_message(ch, method_frame, header_frame, body):
+        # Llegar hasta aqui es &quot;entregado&quot;, nada mas -- RabbitMQ ya nos dio
+        # el mensaje, pero todavia no se borro de verdad. Con auto_ack=False,
+        # &quot;entregado&quot; y &quot;consumido&quot; (borrado permanente) son dos momentos
+        # DISTINTOS: entregado pasa siempre que on_message se ejecuta;
+        # consumido de verdad pasa recien en la linea de basic_ack de abajo
+        # -- y si esa linea nunca se ejecuta (como con mensaje-2 aqui abajo),
+        # el mensaje jamas se consume, aunque ya lo hayamos &quot;recibido&quot; e
+        # impreso.
+        texto = body.decode()
+        print(f&quot;Recibido: {texto!r} (delivery_tag={method_frame.delivery_tag})&quot;)
+
+        if texto == &quot;mensaje-2&quot;:
+            # A proposito NO llamamos basic_ack. Simula un consumer que se
+            # cae (crash, kill -9, excepcion no capturada) despues de recibir
+            # el mensaje pero antes de confirmarlo -- el mismo hueco que
+            # acks_late=True deja abierto en Celery.
+            print(&quot;  -&gt; simulando crash: NO se manda ack para este mensaje.&quot;)
+        else:
+            # AQUI es donde el mensaje se consume/borra de verdad -- no en
+            # la linea de arriba donde lo &quot;recibimos&quot;. mensaje-1 y mensaje-3
+            # pasan por aqui; mensaje-2 nunca (ver el &quot;if&quot; de arriba), por
+            # eso el unico que sobrevive para la ronda 2.
+            ch.basic_ack(delivery_tag=method_frame.delivery_tag)
+            print(&quot;  -&gt; ack enviado.&quot;)
+
+        procesados.append(texto)
+        # stop_consuming() es la UNICA razon por la que start_consuming()
+        # (mas abajo) no se queda escuchando para siempre. Sin este corte,
+        # el script procesaria los 3 mensajes igual, pero despues se
+        # quedaria bloqueado esperando un 4to mensaje que nunca llega -- asi
+        # es como corre un worker de verdad en produccion: no sabe cuantos
+        # mensajes van a llegar, simplemente se queda escuchando.
+        if len(procesados) == 3:
+            ch.stop_consuming()
+
+    # basic_consume() NO consume nada por si solo: solo SUSCRIBE este canal
+    # a la cola (&quot;de ahora en adelante, empujame lo que llegue y avisame por
+    # on_message&quot;). Retorna casi al instante, no bloquea.
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=on_message, auto_ack=False)
+
+    # start_consuming() es lo que de verdad bloquea: entra a un loop que lee
+    # frames del socket y dispara on_message por cada uno, sin saber de
+    # antemano cuantos van a llegar. Se queda &quot;escuchando&quot; indefinidamente
+    # hasta que algo (aqui, el propio callback via stop_consuming()) le
+    # diga que pare.
+    channel.start_consuming()
+
+    # Cerramos SIN haber ackeado &quot;mensaje-2&quot;. Ese mensaje sigue en estado
+    # &quot;unacked&quot; ligado a este canal; al cerrar la conexion, RabbitMQ lo
+    # detecta y lo vuelve a poner en la cola para el proximo consumer.
+    connection.close()
+    print(&quot;Conexion de ronda 1 cerrada (mensaje-2 nunca fue ackeado).\n&quot;)
+
+
+def ronda_2():
+    print(&quot;=== Ronda 2: nueva conexion, ver que mensaje-2 reaparecio ===&quot;)
+    connection, channel = connect()
+
+    recibidos = []
+
+    def on_message(ch, method_frame, header_frame, body):
+        texto = body.decode()
+        print(f&quot;Recibido: {texto!r} (delivery_tag={method_frame.delivery_tag})&quot;)
+        # Aqui SI se consume/borra de verdad &quot;mensaje-2&quot; -- la primera vez
+        # (ronda_1) se entrego pero nunca se llego a este punto.
+        ch.basic_ack(delivery_tag=method_frame.delivery_tag)
+        print(&quot;  -&gt; ack enviado (esta vez si).&quot;)
+        recibidos.append(texto)
+        # Igual que en ronda_1: sin este stop_consoming(), start_consuming()
+        # de abajo se quedaria escuchando para siempre esperando otro
+        # mensaje que nunca va a llegar (la cola solo tenia el 1 redeliverado).
+        if len(recibidos) == 1:
+            ch.stop_consuming()
+
+    # basic_consume() solo suscribe (no bloquea); start_consuming() es el
+    # que bloquea de verdad escuchando lo que llegue -- ver los comentarios
+    # equivalentes en ronda_1() para el detalle completo.
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=on_message, auto_ack=False)
+    channel.start_consuming()
+
+    assert recibidos == [&quot;mensaje-2&quot;], (
+        f&quot;Se esperaba que solo &#x27;mensaje-2&#x27; quedara pendiente, llego {recibidos}&quot;
+    )
+    print(&quot;Confirmado: &#x27;mensaje-2&#x27; fue redeliverado porque nunca se ackeo.&quot;)
+
+    connection.close()
+    print(&quot;Conexion de ronda 2 cerrada.&quot;)
+
+
+def main():
+    ronda_1()
+    ronda_2()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+      
+    <p class="section-label">Cómo se arman las rondas</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 760 195" class="diag" role="img" aria-label="Las dos rondas de basic_consume con ack manual"><defs><marker id="arrow-02-rounds" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="40" width="260" height="130" rx="12" class="diag-box diag-box-accent"/><text x="150.0" y="66" class="diag-text">Ronda 1</text><text x="150.0" y="86" class="diag-sub">publica 3 mensajes</text><text x="150.0" y="106" class="diag-sub">ack #1 y #3 — #2 sin ack (crash)</text><text x="150.0" y="126" class="diag-sub">cierra la conexión</text><rect x="480" y="40" width="260" height="130" rx="12" class="diag-box"/><text x="610.0" y="66" class="diag-text">Ronda 2</text><text x="610.0" y="86" class="diag-sub">nueva conexión</text><text x="610.0" y="106" class="diag-sub">mensaje-2 reaparece (redelivered)</text><text x="610.0" y="126" class="diag-sub">se ackea — ciclo cerrado</text><path d="M280,100 L480,100" class="diag-arrow" marker-end="url(#arrow-02-rounds)"/><text x="380" y="82" class="diag-arrow-label" font-size="11" text-anchor="middle">RabbitMQ redelivera solo</text><text x="380" y="128" class="diag-arrow-label" font-size="11" text-anchor="middle">(canal murió con 1 unacked)</text></svg></div>
+    
+
+      
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>3</b></span><span class="badge">Unacked: <b>0</b></span><span class="badge">Consumers: <b>0</b></span></div>
+          <pre class="outterm">=== Ronda 1: publicar 3, ackear 2, dejar 1 sin ack a propósito ===
+3 mensajes publicados.</pre>
+          <p class="outnote">Los 3 mensajes se publican antes de que nadie esté suscrito todavía.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>3</b></span><span class="badge">Consumers: <b>1</b></span></div>
+          <pre class="outterm">(basic_consume arranca; nadie limita cuántos entrega -- eso es el paso 03)</pre>
+          <p class="outnote">Rabbit empuja los 3 mensajes de una sola vez al único consumer suscrito. Los tres quedan "entregados pero no confirmados" al instante.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Unacked: <b>2</b></span></div>
+          <pre class="outterm">Recibido: &#x27;mensaje-1&#x27; (delivery_tag=1)
+  -&gt; ack enviado.</pre>
+          <p class="outnote">Éste es el camino feliz completo: entregado → procesado → <code>basic_ack</code> → borrado para siempre.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Unacked: <b>2</b></span></div>
+          <pre class="outterm">Recibido: &#x27;mensaje-2&#x27; (delivery_tag=2)
+  -&gt; simulando crash: NO se manda ack para este mensaje.</pre>
+          <p class="outnote">El script imprime que lo "recibió", pero deliberadamente no llama a <code>basic_ack</code> — simula un worker que revienta a mitad de tarea.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Unacked: <b>1</b></span></div>
+          <pre class="outterm">Recibido: &#x27;mensaje-3&#x27; (delivery_tag=3)
+  -&gt; ack enviado.</pre>
+          <p class="outnote">mensaje-3 sí se confirma normal. Solo mensaje-2 queda colgado, ligado a este canal.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>1</b></span><span class="badge">Unacked: <b>0</b></span><span class="badge">Consumers: <b>0</b></span></div>
+          <pre class="outterm">Conexion de ronda 1 cerrada (mensaje-2 nunca fue ackeado).</pre>
+          <p class="outnote">Al cerrar la conexión con un mensaje unacked pendiente, RabbitMQ lo detecta y lo re-encola automáticamente. <strong>Nadie reenvió nada</strong> — Rabbit lo hizo por su cuenta.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>0</b></span></div>
+          <pre class="outterm">=== Ronda 2: nueva conexión, ver que mensaje-2 reapareció ===
+Recibido: &#x27;mensaje-2&#x27; (delivery_tag=1)
+  -&gt; ack enviado (esta vez si).</pre>
+          <p class="outnote">Conexión nueva, consumer nuevo — y aun así aparece mensaje-2 solo, con <code>redelivered=True</code>. Esta vez sí se confirma.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">Confirmado: &#x27;mensaje-2&#x27; fue redeliverado porque nunca se ackeo.
+Conexion de ronda 2 cerrada.</pre>
+          <p class="outnote">Cierre del ciclo: el mismo hueco que deja <code>acks_late=True</code> en Celery, reproducido con RabbitMQ puro.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button><button class="outdot" data-i="5"></button><button class="outdot" data-i="6"></button><button class="outdot" data-i="7"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-03" data-index="3" role="tabpanel" aria-labelledby="tab-03">
+      <div class="panel-head">
+        <p class="kicker">RabbitMQ · control de flujo</p>
+        <h2>Paso 3 &middot; basic_qos(prefetch_count=N)</h2>
+        <p class="tagline">Cuántos mensajes sin confirmar puede tener un consumer a la vez — el equivalente exacto de worker_prefetch_multiplier.</p>
+        <div class="chips"><span class="chip">basic_qos</span><span class="chip">prefetch_count</span><span class="chip">worker_prefetch_multiplier</span><span class="chip">fairness vs throughput</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 730 210" class="diag" role="img" aria-label="basic_qos como válvula de entrega entre la cola y los consumers"><defs><marker id="arrow-03" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="65" width="170" height="60" rx="12" class="diag-box"/><text x="105.0" y="89" class="diag-text">step3_queue</text><text x="105.0" y="108" class="diag-sub">10 mensajes</text><rect x="300" y="15" width="190" height="55" rx="12" class="diag-box diag-box-accent"/><text x="395.0" y="36" class="diag-text">basic_qos</text><text x="395.0" y="56" class="diag-sub">prefetch_count=N</text><rect x="300" y="130" width="190" height="55" rx="12" class="diag-box"/><text x="395.0" y="152" class="diag-text">sin límite</text><text x="395.0" y="170" class="diag-sub">prefetch=0 (default)</text><rect x="560" y="15" width="150" height="55" rx="12" class="diag-box"/><text x="635.0" y="36" class="diag-text">worker_lento</text><text x="635.0" y="56" class="diag-sub">1.0s / mensaje</text><rect x="560" y="130" width="150" height="55" rx="12" class="diag-box"/><text x="635.0" y="152" class="diag-text">worker_rapido</text><text x="635.0" y="170" class="diag-sub">0.1s / mensaje</text><path d="M190,80 L300,45" class="diag-arrow" marker-end="url(#arrow-03)"/><text x="245" y="35" class="diag-arrow-label" text-anchor="middle">con QoS</text><path d="M190,95 L300,155" class="diag-arrow" marker-end="url(#arrow-03)"/><text x="245" y="85" class="diag-arrow-label" text-anchor="middle">sin QoS</text><path d="M490,43 L560,43" class="diag-arrow" marker-end="url(#arrow-03)"/><path d="M490,157 L560,157" class="diag-arrow" marker-end="url(#arrow-03)"/></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">Prefetch vs el semáforo del paso 07</p>
+        <p><code>prefetch_count</code> lo hace cumplir <strong>RabbitMQ</strong>, a nivel de
+            protocolo AMQP — controla cuántos mensajes le entrega al canal. El semáforo que se
+            construirá en el paso 07 (<code>WORKER_CONCURRENCY</code>) lo hace cumplir
+            <strong>nuestro propio código de aplicación</strong> — cuántas llamadas HTTP concurrentes
+            se dejan correr. En Celery real ambos coinciden por diseño: <code>prefetch_count =
+            worker_prefetch_multiplier × concurrency</code>.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>Sin límite, RabbitMQ empuja mensajes a un consumer tan rápido como el socket lo permite,
+        sin preguntar si ese consumer ya está ocupado — se acumulan del lado del cliente como
+        "unacked", esperando turno de CPU/callback. <code>basic_qos(prefetch_count=N)</code> es la
+        válvula que le dice al servidor: "no me entregues nada nuevo si ya tengo N sin confirmar".</p>
+        <p>Esto es, número por número, el mecanismo detrás de <code>worker_prefetch_multiplier</code>
+        de Celery (default 4): el <code>prefetch_count</code> real que un worker Celery le pide a
+        Rabbit es <code>worker_prefetch_multiplier × --concurrency</code>. Con los defaults y
+        <code>--concurrency=2</code>, ese worker reserva 8 tareas sin confirmar aunque solo pueda
+        correr 2 en paralelo — 6 quedan "en cola local", esperando turno, aunque hubiera 500 tareas
+        más urgentes esperando en Rabbit que otro worker más libre podría tomar antes. Con
+        <code>multiplier=1</code> (lo que se prueba aquí, <code>prefetch_count=1</code> por
+        consumer), un worker nunca acapara más de lo que puede procesar ahora mismo.</p>
+        <p>La demo deja ver la diferencia entre dos preguntas que se confunden fácil:
+        <strong>control de flujo</strong> no es lo mismo que <strong>balanceo de carga</strong>.
+        Sin límite (escenario 1), el primer consumer suscrito se lleva todo de una sola vez — ni
+        siquiera es que sea "más rápido", es que llegó primero y no había ningún límite que se lo
+        impidiera. Con <code>prefetch_count=1</code> (escenario 2), nadie puede acaparar más de un
+        mensaje sin confirmar, pero el reparto final tampoco es 50/50: el worker rápido sigue
+        terminando con la mayoría, porque en el 1 segundo que el worker lento tarda en soltar su
+        único slot, el rápido ya tuvo tiempo de pedir y procesar varios más. Prefetch acota
+        <em>cuánto puede haber en vuelo</em>, no decide <em>a quién le toca</em>.</p>
+        <p>Vale la pena anotar un detalle de la UI de RabbitMQ que confunde a cualquiera la primera
+        vez: <strong>"Prefetch count: 0" en la pestaña Channels significa "ilimitado"</strong>, no
+        "cero mensajes".</p>
+        
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 3: basic_qos(prefetch_count=N) -- el limite de &quot;cuantos mensajes sin confirmar puede tener un consumer a la vez&quot;.</p>
+        <pre class="instr-code">docker compose up -d
+python3 03_qos_prefetch.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>03_qos_prefetch.py</code> completo (153 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import os
+import threading
+import time
+
+import pika
+
+QUEUE_NAME = &quot;step3_queue&quot;
+NUM_MESSAGES = 10
+
+RABBITMQ_HOST = os.environ.get(&quot;RABBITMQ_HOST&quot;, &quot;localhost&quot;)
+RABBITMQ_PORT = int(os.environ.get(&quot;RABBITMQ_PORT&quot;, &quot;5672&quot;))
+
+
+def _connect():
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT)
+    )
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME)
+    return connection, channel
+
+
+def _purge():
+    connection, channel = _connect()
+    channel.queue_purge(queue=QUEUE_NAME)
+    connection.close()
+
+
+def _publish(n):
+    connection, channel = _connect()
+    for i in range(1, n + 1):
+        channel.basic_publish(exchange=&quot;&quot;, routing_key=QUEUE_NAME, body=f&quot;msg-{i}&quot;)
+    connection.close()
+    print(f&quot;{n} mensajes publicados.&quot;)
+
+
+def _worker(nombre, prefetch_count, sleep_seconds, procesados, total_esperado, deadline):
+    &quot;&quot;&quot;Corre en su propio hilo, con su propia connection (pika no es
+    thread-safe: cada connection solo se puede usar desde el hilo que la
+    creo).&quot;&quot;&quot;
+    connection, channel = _connect()
+    if prefetch_count is not None:
+        channel.basic_qos(prefetch_count=prefetch_count)
+
+    def on_message(ch, method_frame, header_frame, body):
+        time.sleep(sleep_seconds)  # simula el &quot;trabajo&quot; de procesar el mensaje
+        ch.basic_ack(delivery_tag=method_frame.delivery_tag)
+        procesados[nombre].append(body.decode())
+        print(f&quot;  [{nombre}] proceso {body.decode()!r} (lleva {len(procesados[nombre])})&quot;)
+
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=on_message)
+
+    # Loop manual (en vez de start_consuming) para poder parar cuando ya se
+    # proceso todo lo esperado, sin bloquear para siempre.
+    while time.monotonic() &lt; deadline:
+        if sum(len(v) for v in procesados.values()) &gt;= total_esperado:
+            break
+        connection.process_data_events(time_limit=0.2)
+
+    connection.close()
+
+
+def escenario_1_sin_limite():
+    print(&quot;=== Escenario 1: SIN basic_qos (default = ilimitado) ===&quot;)
+    _purge()
+    procesados = {&quot;worker_lento&quot;: [], &quot;worker_rapido&quot;: []}
+    deadline = time.monotonic() + 15
+
+    t_lento = threading.Thread(
+        target=_worker,
+        args=(&quot;worker_lento&quot;, None, 1.0, procesados, NUM_MESSAGES, deadline),  # sin prefetch_count (ilimitado)
+    )
+    t_lento.start()  # lanza el hilo, no bloquea
+    time.sleep(0.5)  # asegurar que worker_lento ya esta suscrito
+
+    _publish(NUM_MESSAGES)
+    time.sleep(0.5)  # darle tiempo a Rabbit de entregarle TODO a worker_lento
+
+    t_rapido = threading.Thread(
+        target=_worker,
+        args=(&quot;worker_rapido&quot;, None, 0.1, procesados, NUM_MESSAGES, deadline),  # sin prefetch_count (ilimitado)
+    )
+    t_rapido.start()  # lanza el hilo, no bloquea
+
+    t_lento.join()  # bloquea aca ~10s; en la UI, Unacked=10 bajando de a uno cada 1s
+    t_rapido.join()  # no espera casi nada: worker_rapido ya termino con 0 procesados
+    # (en la UI, aca es donde la cola ya mostro Consumers=2 -- ambos suscritos --
+    # pero a worker_rapido nunca le llego nada porque Rabbit ya le habia dado
+    # los 10 a worker_lento antes de que este se suscribiera)
+
+    print(f&quot;worker_lento proceso: {len(procesados[&#x27;worker_lento&#x27;])}&quot;)
+    print(f&quot;worker_rapido proceso: {len(procesados[&#x27;worker_rapido&#x27;])}&quot;)
+    assert len(procesados[&quot;worker_rapido&quot;]) == 0, &quot;se esperaba que worker_rapido no procesara nada&quot;
+    assert len(procesados[&quot;worker_lento&quot;]) == NUM_MESSAGES
+    print(
+        &quot;Confirmado: sin prefetch_count, Rabbit ya le habia entregado los 10 a &quot;
+        &quot;worker_lento (unico consumer al momento de publicar) -- worker_rapido &quot;
+        &quot;se quedo sin nada que hacer aunque procesa 10x mas rapido.\n&quot;
+    )
+
+
+def escenario_2_con_prefetch_1():
+    print(&quot;=== Escenario 2: CON basic_qos(prefetch_count=1) en ambos ===&quot;)
+    _purge()
+    procesados = {&quot;worker_lento&quot;: [], &quot;worker_rapido&quot;: []}
+    deadline = time.monotonic() + 15
+
+    t_lento = threading.Thread(
+        target=_worker,
+        args=(&quot;worker_lento&quot;, 1, 1.0, procesados, NUM_MESSAGES, deadline),  # prefetch_count=1
+    )
+    t_rapido = threading.Thread(
+        target=_worker,
+        args=(&quot;worker_rapido&quot;, 1, 0.1, procesados, NUM_MESSAGES, deadline),  # prefetch_count=1
+    )
+    t_lento.start()  # lanza el hilo, no bloquea
+    t_rapido.start()  # lanza el hilo, no bloquea
+    time.sleep(0.5)  # asegurar que AMBOS ya esten suscritos con su QoS aplicado
+
+    _publish(NUM_MESSAGES)
+
+    t_lento.join()  # espera a que ese hilo termine
+    t_rapido.join()  # espera a que ese hilo termine
+
+    print(f&quot;worker_lento proceso: {len(procesados[&#x27;worker_lento&#x27;])}&quot;)
+    print(f&quot;worker_rapido proceso: {len(procesados[&#x27;worker_rapido&#x27;])}&quot;)
+    # Lo unico que prefetch_count=1 garantiza es que nadie acapara los 10 de
+    # una (a diferencia del Escenario 1). Cuanto le toca a cada worker depende
+    # de una carrera de red al momento de basic_consume -- no determinista,
+    # asi que NO se puede asegurar que worker_lento siempre procese &gt; 0.
+    # Tampoco es un reparto equitativo: worker_rapido (0.1s) suele terminar
+    # con la mayoria -- en el 1s que worker_lento tarda en soltar su unico
+    # slot, worker_rapido ya tuvo tiempo de comerse casi todo el resto de la
+    # cola. prefetch_count es control de flujo (cuantos &quot;en vuelo&quot; a la vez),
+    # no un balanceador de carga.
+    assert len(procesados[&quot;worker_lento&quot;]) + len(procesados[&quot;worker_rapido&quot;]) == NUM_MESSAGES
+    print(
+        &quot;Confirmado: con prefetch_count=1, ningun worker puede acaparar mas de &quot;
+        &quot;1 mensaje sin confirmar -- el trabajo se reparte segun quien ackea &quot;
+        &quot;primero. Cuantos le tocan a cada uno varia de corrida en corrida &quot;
+        &quot;(depende de una carrera al momento de suscribirse), pero nunca los &quot;
+        &quot;10 de una como en el escenario 1.&quot;
+    )
+
+
+def main():
+    escenario_1_sin_limite()
+    escenario_2_con_prefetch_1()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+      
+    <p class="section-label">Cómo se reparte el trabajo en cada escenario</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 720 195" class="diag" role="img" aria-label="Cuántos mensajes procesa cada worker en cada escenario"><rect x="170" y="15" width="250" height="52" rx="12" class="diag-box"/><text x="295.0" y="35" class="diag-text">worker_lento</text><text x="295.0" y="54" class="diag-sub">1.0s / mensaje</text><rect x="440" y="15" width="250" height="52" rx="12" class="diag-box"/><text x="565.0" y="35" class="diag-text">worker_rapido</text><text x="565.0" y="54" class="diag-sub">0.1s / mensaje</text><text x="10" y="46" class="diag-sub" font-size="12.5" style="text-anchor:start">workers →</text><text x="10" y="104" class="diag-text" font-size="13" style="text-anchor:start">Escenario 1</text><text x="10" y="119" class="diag-sub" font-size="11.5" style="text-anchor:start">sin límite</text><rect x="170" y="82" width="250" height="42" rx="8" class="result-ok"/><text x="295.0" y="108" class="result-text" text-anchor="middle">procesó 10 / 10</text><rect x="440" y="82" width="250" height="42" rx="8" class="result-fail"/><text x="565.0" y="108" class="result-text" text-anchor="middle">procesó 0 / 10</text><text x="10" y="159" class="diag-text" font-size="13" style="text-anchor:start">Escenario 2</text><text x="10" y="174" class="diag-sub" font-size="11.5" style="text-anchor:start">prefetch=1</text><rect x="170" y="137" width="250" height="42" rx="8" class="result-ok"/><text x="295.0" y="163" class="result-text" text-anchor="middle">procesó ~3 / 10</text><rect x="440" y="137" width="250" height="42" rx="8" class="result-ok"/><text x="565.0" y="163" class="result-text" text-anchor="middle">procesó ~7 / 10</text></svg></div>
+    
+
+      
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">Consumers: <b>1</b></span><span class="badge">Ready: <b>0</b></span></div>
+          <pre class="outterm">=== Escenario 1: SIN basic_qos (default = ilimitado) ===
+(worker_lento se suscribe, solo)</pre>
+          <p class="outnote">En la pestaña Channels, el "Prefetch count" de worker_lento sale en 0 — que en la UI de RabbitMQ significa <em>ilimitado</em>, no "cero mensajes".</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>0</b></span><span class="badge">Unacked: <b>10</b></span></div>
+          <pre class="outterm">10 mensajes publicados.</pre>
+          <p class="outnote">Como worker_lento es el único suscrito y no hay límite, Rabbit le entrega los 10 de una sola vez. Quedan "unacked" aunque el callback los vaya a procesar de a uno cada 1 segundo.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Consumers: <b>2</b></span><span class="badge">Ready: <b>0</b></span></div>
+          <pre class="outterm">(worker_rapido se suscribe medio segundo después)</pre>
+          <p class="outnote">Aparece un consumer más (consumers=2) pero no le llega nada — la cola ya no tiene nada en Ready, todo está ya reservado por worker_lento.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">  [worker_lento] proceso &#x27;msg-1&#x27; (lleva 1)
+  ... (9 líneas más, una cada 1s) ...
+worker_lento proceso: 10
+worker_rapido proceso: 0</pre>
+          <p class="outnote">Confirmado: sin <code>prefetch_count</code>, Rabbit ya le había entregado los 10 a worker_lento (único consumer al momento de publicar) — worker_rapido se quedó sin nada que hacer aunque procesa 10x más rápido.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Consumers: <b>2</b></span></div>
+          <pre class="outterm">=== Escenario 2: CON basic_qos(prefetch_count=1) en ambos ===
+(ambos se suscriben ANTES de publicar, cada uno con QoS=1)</pre>
+          <p class="outnote">Esta vez los dos consumers ya están suscritos, cada uno con su propio límite de 1, antes de que exista un solo mensaje.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>8</b></span><span class="badge">Unacked: <b>2</b></span></div>
+          <pre class="outterm">10 mensajes publicados.</pre>
+          <p class="outnote">Rabbit ya no puede darle más de 1 mensaje sin confirmar a cada uno — el resto se queda en Ready hasta que alguno ackee.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">  [worker_rapido] proceso &#x27;msg-1&#x27; (lleva 1)
+  [worker_lento] proceso &#x27;msg-2&#x27; (lleva 1)
+  [worker_rapido] proceso &#x27;msg-3&#x27; (lleva 2)
+  ... (ejemplo ilustrativo -- el reparto exacto varía de corrida en corrida) ...
+worker_lento proceso: 3
+worker_rapido proceso: 7</pre>
+          <p class="outnote">El reparto no es 50/50 ni determinista (depende de una carrera de red al suscribirse), pero <strong>nadie acapara los 10 de una</strong> como en el escenario 1 — la diferencia real que garantiza <code>prefetch_count</code>.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button><button class="outdot" data-i="5"></button><button class="outdot" data-i="6"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-04" data-index="4" role="tabpanel" aria-labelledby="tab-04">
+      <div class="panel-head">
+        <p class="kicker">Cliente HTTP · timeouts</p>
+        <h2>Paso 4 &middot; Timeout bare-int vs httpx.Timeout partido</h2>
+        <p class="tagline">Un solo número para cuatro fases distintas — y por qué eso disfraza una espera de pool como si fuera un downstream lento.</p>
+        <div class="chips"><span class="chip">httpx.Timeout(connect, read, write, pool)</span><span class="chip">httpx.Limits</span><span class="chip">PoolTimeout</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 750 180" class="diag" role="img" aria-label="Requests esperando un slot del pool antes de leer al servidor"><defs><marker id="arrow-0405-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="60" width="160" height="65" rx="12" class="diag-box"/><text x="100.0" y="86" class="diag-text">Requests</text><text x="100.0" y="106" class="diag-sub">asyncio.gather</text><rect x="290" y="15" width="190" height="145" rx="12" class="diag-box diag-box-accent"/><text x="385.0" y="39" class="diag-text">Pool httpx.Limits</text><text x="385.0" y="56" class="diag-sub">max_connections=N</text><rect x="320" y="90" width="130" height="50" rx="12" class="diag-box"/><text x="385.0" y="109" class="diag-text">esperar slot</text><text x="385.0" y="128" class="diag-sub">(fase pool)</text><rect x="580" y="60" width="150" height="65" rx="12" class="diag-box"/><text x="655.0" y="86" class="diag-text">Servidor lento</text><text x="655.0" y="106" class="diag-sub">duerme 3.0s</text><path d="M180,92 L290,92" class="diag-arrow" marker-end="url(#arrow-0405-d)"/><text x="235" y="77" class="diag-arrow-label" text-anchor="middle">piden conexión</text><path d="M480,80 L580,80" class="diag-arrow" marker-end="url(#arrow-0405-d)"/><text x="530" y="70" class="diag-arrow-label" text-anchor="middle">conectan (fase read)</text><path d="M580,112 L480,112" class="diag-arrow" marker-end="url(#arrow-0405-d)"/><text x="530" y="133" class="diag-arrow-label" text-anchor="middle">responden</text></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">Ojo con el nombre repetido</p>
+        <p><code>pool=</code> dentro de <code>httpx.Timeout</code> es un tiempo en
+            segundos (cuánto esperar antes de rendirse). <code>max_connections=</code> dentro de
+            <code>httpx.Limits</code> es una cantidad (cuántas conexiones simultáneas existen). Que
+            ambos se llamen "pool" es solo nomenclatura de httpx, no una relación matemática entre
+            los dos números.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>Este es el primer paso que se aleja de RabbitMQ del todo — standalone, contra un
+        servidor propio hecho con <code>http.server</code> que simplemente duerme y responde 200.
+        El punto es aislar un solo mecanismo: qué significa realmente <code>timeout=</code> en
+        httpx.</p>
+        <p>Cuando se pasa un número suelto (<code>timeout=5</code>), httpx lo expande por dentro a
+        <strong>cuatro presupuestos independientes, todos iguales</strong>:</p>
+        <table class="phase-table">
+          <thead><tr><th>Fase</th><th>Qué mide</th><th>Analogía</th></tr></thead>
+          <tbody>
+            <tr><td><code>connect</code></td><td>Esperar el handshake TCP</td><td>marcar y que suene el teléfono</td></tr>
+            <tr><td><code>write</code></td><td>Esperar a mandar el body del request</td><td>terminar de hablar</td></tr>
+            <tr><td><code>read</code></td><td>Esperar la respuesta ya conectado</td><td>esperar a que conteste ("el downstream tardó")</td></tr>
+            <tr><td><code>pool</code></td><td>Esperar un slot libre del pool <em>antes de intentar conectar</em></td><td>esperar a que una línea del conmutador quede libre</td></tr>
+          </tbody>
+        </table>
+        <p>httpx sí distingue las cuatro fases internamente — cada una tiene su propio reloj que
+        arranca en cero al entrar a esa fase. El problema del bare-int no es que se pierda esa
+        separación técnica; es que con un solo número no se le puede dar a <code>pool</code> un
+        presupuesto corto (para fallar rápido si no hay conexiones libres) mientras se le da a
+        <code>read</code> uno largo (para tolerar un downstream legítimamente lento). Si el número
+        es lo bastante grande para lo segundo, automáticamente también lo es para lo primero — y
+        entonces una espera larga de pool se disuelve, invisible, dentro del mismo margen que un
+        read normal.</p>
+        <p>Con <code>httpx.Timeout(pool=1, read=5, ...)</code> (escenario B), la fase
+        <code>pool</code> tiene su propio presupuesto corto: req-2 falla en ~1s con
+        <code>httpx.PoolTimeout</code> explícito, sin haber tocado la red — una señal de tipo
+        distinto (excepción, no solo duración), separada del presupuesto generoso que sigue
+        protegiendo a un <code>read</code> lento legítimo.</p>
+        <p>Además de <code>timeout</code>, <code>httpx.Limits</code> tiene tres parámetros propios
+        que también conviene no confundir entre sí:</p>
+        <table class="phase-table">
+          <thead><tr><th>Parámetro</th><th>Tipo</th><th>Qué controla</th></tr></thead>
+          <tbody>
+            <tr><td><code>max_connections</code></td><td>cantidad</td><td>tope de conexiones simultáneas — esto es lo que agota el pool</td></tr>
+            <tr><td><code>max_keepalive_connections</code></td><td>cantidad</td><td>de las que ya terminaron, cuántas se guardan abiertas para reusar</td></tr>
+            <tr><td><code>keepalive_expiry</code></td><td>segundos</td><td>cuánto tiempo se mantiene abierta una conexión ociosa antes de cerrarla sola</td></tr>
+          </tbody>
+        </table>
+        <p>En este script <code>max_connections</code> y <code>max_keepalive_connections</code> se
+        pasan con el mismo número (1) solo para que no haya cierre/reapertura de conexión entre
+        requests — no hace falta para el mecanismo de <code>PoolTimeout</code> en sí, que depende
+        únicamente de <code>max_connections</code>. <code>keepalive_expiry</code> ni se toca: queda
+        en su default de httpx (5.0s).</p>
+
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 4: timeout bare-int vs <code>httpx.Timeout</code> partido.</p>
+        <pre class="instr-code">pip install -r requirements.txt   # agrega httpx
+python3 04_http_timeout.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>04_http_timeout.py</code> completo (164 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import asyncio
+import http.server
+import os
+import threading
+import time
+
+import httpx
+
+SLEEP_SECONDS = float(os.environ.get(&quot;SLEEP_SECONDS&quot;, &quot;3&quot;))
+BARE_TIMEOUT = float(os.environ.get(&quot;BARE_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_CONNECT_TIMEOUT = float(os.environ.get(&quot;SPLIT_CONNECT_TIMEOUT&quot;, &quot;2&quot;))
+SPLIT_READ_TIMEOUT = float(os.environ.get(&quot;SPLIT_READ_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_WRITE_TIMEOUT = float(os.environ.get(&quot;SPLIT_WRITE_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_POOL_TIMEOUT = float(os.environ.get(&quot;SPLIT_POOL_TIMEOUT&quot;, &quot;1&quot;))
+
+
+class SlowHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        time.sleep(SLEEP_SECONDS)  # simula &quot;el downstream tarda&quot;
+        body = b&quot;ok&quot;
+        self.send_response(200)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass  # silenciar el log default de http.server, ensuciaria la demo
+
+
+def start_server():
+    # ThreadingHTTPServer: una conexion entrante = un hilo nuevo, asi que dos
+    # requests concurrentes de verdad corren en paralelo del lado servidor
+    # (si fuera HTTPServer a secas, atenderia una a la vez y arruinaria la
+    # demo de contencion de pool).
+    server = http.server.ThreadingHTTPServer((&quot;127.0.0.1&quot;, 0), SlowHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
+async def _timed_get(client, url, nombre):
+    inicio = time.monotonic()
+    try:
+        resp = await client.get(url)
+        elapsed = time.monotonic() - inicio
+        print(f&quot;  [{nombre}] OK status={resp.status_code} en {elapsed:.1f}s&quot;)
+        return (&quot;ok&quot;, elapsed)
+    except httpx.TimeoutException as e:
+        elapsed = time.monotonic() - inicio
+        print(f&quot;  [{nombre}] {type(e).__name__} en {elapsed:.1f}s&quot;)
+        return (type(e).__name__, elapsed)
+
+
+async def escenario_bare_int(url):
+    print(f&quot;=== Escenario A: timeout={BARE_TIMEOUT} bare-int (mismo numero para connect/read/write/pool) ===&quot;)
+    # max_connections=1: pool de una sola conexion a proposito, para que dos
+    # requests concurrentes compitan de verdad por el mismo slot.
+    limits = httpx.Limits(max_connections=1, max_keepalive_connections=1)
+    # asyncio.gather lanza las dos corrutinas juntas, &quot;al mismo tiempo&quot; (t=0.0s
+    # para ambas) -- de ahi en mas, quien consigue el unico slot del pool y
+    # quien tiene que esperar ya depende del pool, no de esta linea.
+    async with httpx.AsyncClient(timeout=BARE_TIMEOUT, limits=limits) as client:
+        req1, req2 = await asyncio.gather(
+            _timed_get(client, url, &quot;req-1&quot;),
+            _timed_get(client, url, &quot;req-2&quot;),
+        )
+    return req1, req2
+
+
+async def escenario_split(url):
+    print(
+        f&quot;=== Escenario B: httpx.Timeout(connect={SPLIT_CONNECT_TIMEOUT}, &quot;
+        f&quot;read={SPLIT_READ_TIMEOUT}, write={SPLIT_WRITE_TIMEOUT}, &quot;
+        f&quot;pool={SPLIT_POOL_TIMEOUT}) -- pool corto a proposito ===&quot;
+    )
+    # Ojo: estos cuatro numeros son SEGUNDOS (cuanto esperar antes de rendirse
+    # en cada fase), no cantidades. connect=2.0 no significa &quot;2 requests&quot;, y
+    # pool=1.0 no significa &quot;1 conexion&quot; -- esa cantidad la fija por separado
+    # max_connections=1 en el httpx.Limits de abajo. Son dos preguntas
+    # distintas que en esta config casualmente dan el mismo numero (1):
+    # &quot;cuantas conexiones simultaneas hay&quot; (max_connections) vs &quot;si no hay
+    # ninguna libre, cuanto espero antes de tirar la toalla&quot; (pool timeout).
+    # Con pool=1.0 mas abajo, req-2 va a fallar justo al llegar a 1 segundo de
+    # espera -- ni antes ni despues, porque ese es el presupuesto exacto que
+    # se le da a esa fase (ver SPLIT_POOL_TIMEOUT).
+    timeout = httpx.Timeout(
+        connect=SPLIT_CONNECT_TIMEOUT,
+        read=SPLIT_READ_TIMEOUT,
+        write=SPLIT_WRITE_TIMEOUT,
+        pool=SPLIT_POOL_TIMEOUT,
+    )
+    limits = httpx.Limits(max_connections=1, max_keepalive_connections=1)
+    async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
+        req1, req2 = await asyncio.gather(
+            _timed_get(client, url, &quot;req-1&quot;),
+            _timed_get(client, url, &quot;req-2&quot;),
+        )
+    return req1, req2
+
+
+async def main_async():
+    server = start_server()
+    port = server.server_address[1]
+    url = f&quot;http://127.0.0.1:{port}/&quot;
+    print(f&quot;Servidor propio arriba en {url} (duerme {SLEEP_SECONDS}s por request).\n&quot;)
+
+    req1, req2 = await escenario_bare_int(url)
+    assert req1[0] == &quot;ok&quot; and req2[0] == &quot;ok&quot;, (
+        &quot;se esperaba que ambos requests del bare-int terminaran OK (req-2 solo mas lento)&quot;
+    )
+    # Linea de tiempo real (ejemplo con SLEEP_SECONDS=3, max_connections=1):
+    #   t=0.0s -&gt; req-1 y req-2 arrancan &quot;a la vez&quot; (asyncio.gather)
+    #   t=0.0s -&gt; req-1 agarra la UNICA conexion del pool y empieza a hablar con el servidor
+    #   t=0.0s -&gt; req-2 quiere una conexion, no queda ninguna libre -- espera, sin tocar la red todavia
+    #   t=3.1s -&gt; req-1 termina (el servidor tardo ~3s) y libera la conexion
+    #   t=3.1s -&gt; req-2 recien ahora agarra la conexion libre y arranca su propia llamada
+    #   t=6.1s -&gt; req-2 termina (otros ~3s de respuesta del servidor)
+    # req-2 nunca dispara timeout porque cada fase (pool: 0-&gt;3.1s, read: 3.1-&gt;6.1s)
+    # se mantuvo POR SEPARADO por debajo del presupuesto de 5s -- aunque la SUMA
+    # de las dos fases (6.1s) sea mayor que el numero del timeout.
+    print(
+        f&quot;Confirmado: req-2 tardo {req2[1]:.1f}s (espero el slot del pool + su &quot;
+        f&quot;propia llamada) y aun asi NO hubo ningun error -- el presupuesto de &quot;
+        f&quot;&#x27;pool&#x27; y el de &#x27;read&#x27; son el mismo numero ({BARE_TIMEOUT}s), asi que la &quot;
+        f&quot;espera por el slot cupo comoda dentro del mismo margen que el tiempo de &quot;
+        f&quot;respuesta real. Mirando solo la duracion total, req-2 es indistinguible &quot;
+        f&quot;de &#x27;el downstream tardo mas esta vez&#x27; -- no hay forma de saber que en &quot;
+        f&quot;realidad paso la mitad de ese tiempo esperando un slot libre.\n&quot;
+    )
+
+    req1, req2 = await escenario_split(url)
+    assert req1[0] == &quot;ok&quot;, &quot;se esperaba que req-1 (sin contencion) terminara OK&quot;
+    assert req2[0] == &quot;PoolTimeout&quot;, (
+        f&quot;se esperaba PoolTimeout en req-2, salio {req2[0]!r}&quot;
+    )
+    # 1. req-1 pidio una conexion al pool -&gt; como estaba libre, la tomo al
+    #    instante (t=0s) -&gt; abrio el socket, mando el GET, espero la respuesta
+    #    del servidor (~3s) -&gt; status 200.
+    # 2. req-2 tambien pidio una conexion al pool, al mismo tiempo (t=0s) -&gt;
+    #    pero ya no quedaba ninguna libre (el pool solo tiene 1, y req-1 se la
+    #    quedo) -&gt; se quedo esperando, sin abrir ningun socket, sin mandar
+    #    ningun byte.
+    # 3. Pasado 1s de espera (el limite de &#x27;pool&#x27; en este escenario), httpx le
+    #    tiro PoolTimeout -- ahi termino req-2, sin haber hecho nada hacia la
+    #    red.
+    print(
+        f&quot;Confirmado: con el presupuesto de &#x27;pool&#x27; separado y corto &quot;
+        f&quot;({SPLIT_POOL_TIMEOUT}s), req-2 fallo RAPIDO con PoolTimeout en &quot;
+        f&quot;{req2[1]:.1f}s en vez de esperar en silencio -- una senal explicita y &quot;
+        f&quot;distinta de &#x27;estuve esperando un slot&#x27;, separada del presupuesto de &quot;
+        f&quot;&#x27;read&#x27; (que sigue siendo generoso, {SPLIT_READ_TIMEOUT}s, para tolerar &quot;
+        f&quot;un downstream lento de verdad como el de req-1).&quot;
+    )
+
+    server.shutdown()
+
+
+def main():
+    asyncio.run(main_async())
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+
+    <p class="section-label">Cómo termina cada request en cada escenario</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 720 195" class="diag" role="img" aria-label="Resultado de req-1 y req-2 en escenario A vs escenario B"><rect x="170" y="15" width="250" height="52" rx="12" class="diag-box"/><text x="295.0" y="35" class="diag-text">req-1</text><text x="295.0" y="54" class="diag-sub">sin contención</text><rect x="440" y="15" width="250" height="52" rx="12" class="diag-box"/><text x="565.0" y="35" class="diag-text">req-2</text><text x="565.0" y="54" class="diag-sub">espera el slot del pool</text><text x="10" y="46" class="diag-sub" font-size="12.5" style="text-anchor:start">requests →</text><text x="10" y="104" class="diag-text" font-size="13" style="text-anchor:start">Escenario A</text><text x="10" y="119" class="diag-sub" font-size="11.5" style="text-anchor:start">bare-int 5s</text><rect x="170" y="82" width="250" height="42" rx="8" class="result-ok"/><text x="295.0" y="108" class="result-text" text-anchor="middle">OK ~3.0s</text><rect x="440" y="82" width="250" height="42" rx="8" class="result-ok"/><text x="565.0" y="108" class="result-text" text-anchor="middle">OK ~6.1s (sin error)</text><text x="10" y="159" class="diag-text" font-size="13" style="text-anchor:start">Escenario B</text><text x="10" y="174" class="diag-sub" font-size="11.5" style="text-anchor:start">pool 1s / read 5s</text><rect x="170" y="137" width="250" height="42" rx="8" class="result-ok"/><text x="295.0" y="163" class="result-text" text-anchor="middle">OK ~3.0s</text><rect x="440" y="137" width="250" height="42" rx="8" class="result-fail"/><text x="565.0" y="163" class="result-text" text-anchor="middle">PoolTimeout ~1.0s</text></svg></div>
+
+
+
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">pool: <b>1 slot libre</b></span></div>
+          <pre class="outterm">Servidor propio arriba en http://127.0.0.1:PORT/ (duerme 3.0s por request).</pre>
+          <p class="outnote"><code>ThreadingHTTPServer</code> propio, sin FastAPI — cada conexión entrante corre en su propio hilo, así que dos requests concurrentes sí se atienden en paralelo del lado servidor.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">fase: <b>pool</b></span><span class="badge">slots libres: <b>1</b></span></div>
+          <pre class="outterm">=== Escenario A: timeout=5.0 bare-int (mismo número para connect/read/write/pool) ===</pre>
+          <p class="outnote"><code>max_connections=1</code> a propósito: garantiza que req-1 y req-2, lanzados "a la vez" con <code>asyncio.gather</code>, compitan de verdad por el mismo slot.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">slots libres: <b>0 → 1</b></span></div>
+          <pre class="outterm">  [req-1] OK status=200 en 3.0s</pre>
+          <p class="outnote">req-1 toma el único slot al instante (fase pool ≈0s) y pasa directo a esperar la respuesta del servidor (fase read ≈3.0s).</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">resultado: <b>OK, sin excepción</b></span></div>
+          <pre class="outterm">  [req-2] OK status=200 en 6.1s</pre>
+          <p class="outnote">req-2 esperó ~3.1s por el slot (fase <code>pool</code>) y luego otros ~3s de lectura (fase <code>read</code>) = 6.1s en total — y <strong>ningún error</strong>, porque cada fase por separado se mantuvo bajo el presupuesto de 5s.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">Confirmado: req-2 tardo 6.1s (espero el slot del pool + su propia llamada) y aun asi NO hubo ningun error.</pre>
+          <p class="outnote">Mirando solo la duración total, req-2 es indistinguible de "el downstream tardó más esta vez" — no hay forma de saber que en realidad pasó la mitad de ese tiempo esperando un slot libre.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">fase: <b>pool</b></span><span class="badge">presupuesto pool: <b>1.0s</b></span></div>
+          <pre class="outterm">=== Escenario B: httpx.Timeout(connect=2, read=5, write=5, pool=1) -- pool corto a proposito ===</pre>
+          <p class="outnote">Mismo servidor, mismo pool de 1 conexión — el único cambio es separar el presupuesto de <code>pool</code> del de <code>read</code>.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">resultado req-2: <b>PoolTimeout</b></span></div>
+          <pre class="outterm">  [req-1] OK status=200 en 3.0s
+  [req-2] PoolTimeout en 1.0s</pre>
+          <p class="outnote">req-1 igual que antes. req-2 esta vez <strong>nunca llega a abrir el socket</strong>: falla en la fase <code>pool</code> apenas se cumple 1s de espera.</p>
+        </div><div class="outstep">
+          
+          <pre class="outterm">Confirmado: con el presupuesto de &#x27;pool&#x27; separado y corto (1s), req-2 fallo RAPIDO con PoolTimeout en vez de esperar en silencio.</pre>
+          <p class="outnote">Una señal explícita y distinta de "estuve esperando un slot", separada del presupuesto de <code>read</code> (que sigue siendo generoso, 5s, para tolerar un downstream lento de verdad como el de req-1).</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button><button class="outdot" data-i="5"></button><button class="outdot" data-i="6"></button><button class="outdot" data-i="7"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-05" data-index="5" role="tabpanel" aria-labelledby="tab-05">
+      <div class="panel-head">
+        <p class="kicker">Cliente HTTP · a escala</p>
+        <h2>Paso 5 &middot; Agotamiento real de pool, en rondas</h2>
+        <p class="tagline">12 requests, pool de 3 conexiones, 4 rondas -- y el mismo disfraz del paso 04, ahora con números que sí duelen.</p>
+        <div class="chips"><span class="chip">httpx.Limits(max_connections=N)</span><span class="chip">rondas de contención</span><span class="chip">PoolTimeout a escala</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 750 180" class="diag" role="img" aria-label="12 requests compitiendo por un pool de 3 conexiones, en 4 rondas"><defs><marker id="arrow-05-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="60" width="160" height="65" rx="12" class="diag-box"/><text x="100.0" y="86" class="diag-text">12 requests</text><text x="100.0" y="106" class="diag-sub">asyncio.gather</text><rect x="290" y="15" width="190" height="145" rx="12" class="diag-box diag-box-accent"/><text x="385.0" y="39" class="diag-text">Pool httpx.Limits</text><text x="385.0" y="56" class="diag-sub">max_connections=3</text><rect x="320" y="90" width="130" height="50" rx="12" class="diag-box"/><text x="385.0" y="105" class="diag-text">9 esperan turno</text><text x="385.0" y="122" class="diag-sub">(fase pool, 4 rondas)</text><rect x="580" y="60" width="150" height="65" rx="12" class="diag-box"/><text x="655.0" y="86" class="diag-text">Servidor lento</text><text x="655.0" y="106" class="diag-sub">duerme 2.0s</text><path d="M180,92 L290,92" class="diag-arrow" marker-end="url(#arrow-05-flow)"/><text x="235" y="77" class="diag-arrow-label" text-anchor="middle">piden conexión</text><path d="M480,80 L580,80" class="diag-arrow" marker-end="url(#arrow-05-flow)"/><text x="530" y="70" class="diag-arrow-label" text-anchor="middle">conectan (fase read)</text><path d="M580,112 L480,112" class="diag-arrow" marker-end="url(#arrow-05-flow)"/><text x="530" y="133" class="diag-arrow-label" text-anchor="middle">responden</text></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">El caveat honesto</p>
+        <p>En un worker Celery real esto casi no aplica: cada worker procesa <em>una</em>
+            tarea a la vez, así que no hay "requests concurrentes del mismo proceso" compitiendo por
+            el mismo pool de conexiones. Sigue valiendo la pena entenderlo porque sí aplica tal cual a
+            cualquier servicio FastAPI/asyncio que atiende varias requests a la vez con
+            <code>asyncio.gather</code> (o simplemente varias requests entrantes en paralelo)
+            compartiendo un mismo <code>httpx.AsyncClient</code> — un patrón común en servicios
+            backend con alta concurrencia.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>El paso 04 probó que <code>PoolTimeout</code> existe con el caso mínimo (2 requests,
+        1 conexión). Este paso sube la escala a algo que se parece más a producción:
+        <code>POOL_SIZE=3</code> conexiones, <code>N_REQUESTS=12</code> concurrentes — más requests
+        que conexiones, así que se forman <strong>rondas</strong>. Con <code>ceil(N/POOL)</code>
+        rondas, si nada fallara la ronda <em>K</em> empezaría recién en
+        <code>t=(K-1)×SLEEP_SECONDS</code> y terminaría en <code>t=K×SLEEP_SECONDS</code>.</p>
+        <p>Con el timeout bare-int, cada fase reinicia su reloj al entrar — no es un presupuesto
+        acumulado de principio a fin de todo el request. Eso significa que una ronda sobrevive
+        mientras <em>su propia</em> espera de pool, sola, se mantenga por debajo del número
+        configurado, sin importar cuánto hayan tardado las rondas anteriores.</p>
+        <p>Aquí es donde el disfraz se vuelve más peligroso que en el paso 04: el tipo de excepción
+        ya es el correcto, <code>PoolTimeout</code> — pero viene marcado con <strong>el mismo
+        número</strong> (5s) que tendría cualquier lectura lenta legítima si el downstream de
+        verdad tardara 5 segundos en responder. Un log o una alerta que solo mira
+        "<code>elapsed≈5s, TimeoutException</code>" no tiene forma de distinguir dos causas raíz
+        completamente distintas: no había conexiones libres (se arregla con más
+        <code>max_connections</code>) vs. el downstream está lento de verdad (se arregla en el
+        downstream).</p>
+        <p>Con el presupuesto de <code>pool</code> separado y corto (escenario B), la distinción
+        deja de depender de inspeccionar tipos de excepción con cuidado: se vuelve una cuestión de
+        <strong>magnitud</strong>, visible a simple vista. La escala de tiempo misma de la falla ya
+        dice "esto fue agotamiento de pool", sin necesidad de tocar para nada la paciencia que se le
+        sigue dando a un downstream legítimamente lento.</p>
+        <p>Además de <code>timeout</code>, <code>httpx.Limits</code> tiene tres parámetros propios
+        que también conviene no confundir entre sí:</p>
+        <table class="phase-table">
+          <thead><tr><th>Parámetro</th><th>Tipo</th><th>Qué controla</th></tr></thead>
+          <tbody>
+            <tr><td><code>max_connections</code></td><td>cantidad</td><td>tope de conexiones simultáneas — esto es lo que agota el pool</td></tr>
+            <tr><td><code>max_keepalive_connections</code></td><td>cantidad</td><td>de las que ya terminaron, cuántas se guardan abiertas para reusar</td></tr>
+            <tr><td><code>keepalive_expiry</code></td><td>segundos</td><td>cuánto tiempo se mantiene abierta una conexión ociosa antes de cerrarla sola</td></tr>
+          </tbody>
+        </table>
+        <p>En este script <code>max_connections</code> y <code>max_keepalive_connections</code> se
+        pasan con el mismo valor (<code>POOL_SIZE</code>) solo para que no haya cierre/reapertura de
+        conexión entre rondas — no hace falta para el mecanismo de agotamiento en sí, que depende
+        únicamente de <code>max_connections</code>. <code>keepalive_expiry</code> ni se toca: queda
+        en su default de httpx (5.0s).</p>
+
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 5: agotamiento real del pool de conexiones (<code>httpx.Limits</code>) y como el timeout bare-int disfraza el <code>PoolTimeout</code> resultante.</p>
+        <pre class="instr-code">pip install -r requirements.txt   # ya incluye httpx
+python3 05_pool_exhaustion.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>05_pool_exhaustion.py</code> completo (188 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import asyncio
+import http.server
+import os
+import threading
+import time
+from collections import Counter
+
+import httpx
+
+SLEEP_SECONDS = float(os.environ.get(&quot;SLEEP_SECONDS&quot;, &quot;2&quot;))
+POOL_SIZE = int(os.environ.get(&quot;POOL_SIZE&quot;, &quot;3&quot;))
+N_REQUESTS = int(os.environ.get(&quot;N_REQUESTS&quot;, &quot;12&quot;))
+BARE_TIMEOUT = float(os.environ.get(&quot;BARE_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_CONNECT_TIMEOUT = float(os.environ.get(&quot;SPLIT_CONNECT_TIMEOUT&quot;, &quot;2&quot;))
+SPLIT_READ_TIMEOUT = float(os.environ.get(&quot;SPLIT_READ_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_WRITE_TIMEOUT = float(os.environ.get(&quot;SPLIT_WRITE_TIMEOUT&quot;, &quot;5&quot;))
+SPLIT_POOL_TIMEOUT = float(os.environ.get(&quot;SPLIT_POOL_TIMEOUT&quot;, &quot;1&quot;))
+
+
+class SlowHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        time.sleep(SLEEP_SECONDS)  # simula &quot;el downstream tarda&quot;
+        body = b&quot;ok&quot;
+        self.send_response(200)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass  # silenciar el log default de http.server, ensuciaria la demo
+
+
+def start_server():
+    # ThreadingHTTPServer: cada conexion entrante es un hilo nuevo, asi que
+    # las N_REQUESTS conexiones que sobreviven al pool (las que si consiguen
+    # slot) se atienden de verdad en paralelo del lado servidor.
+    server = http.server.ThreadingHTTPServer((&quot;127.0.0.1&quot;, 0), SlowHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
+async def _timed_get(client, url, nombre):
+    inicio = time.monotonic()
+    try:
+        resp = await client.get(url)
+        elapsed = time.monotonic() - inicio
+        print(f&quot;  [{nombre}] OK status={resp.status_code} en {elapsed:.1f}s&quot;)
+        return (&quot;ok&quot;, elapsed)
+    except httpx.TimeoutException as e:
+        elapsed = time.monotonic() - inicio
+        print(f&quot;  [{nombre}] {type(e).__name__} en {elapsed:.1f}s&quot;)
+        return (type(e).__name__, elapsed)
+
+
+async def _run_oleada(client, url):
+    nombres = [f&quot;req-{i + 1:02d}&quot; for i in range(N_REQUESTS)]
+    resultados = await asyncio.gather(*(_timed_get(client, url, n) for n in nombres))
+    resumen = Counter(tipo for tipo, _elapsed in resultados)
+    print(f&quot;  resumen: {dict(resumen)}&quot;)
+    return resultados, resumen
+
+
+async def escenario_bare_int(url):
+    print(
+        f&quot;=== Escenario A: timeout={BARE_TIMEOUT} bare-int, pool de &quot;
+        f&quot;{POOL_SIZE} conexiones, {N_REQUESTS} requests concurrentes ===&quot;
+    )
+    # max_connections=POOL_SIZE: maximo POOL_SIZE (3) conexiones simultaneas
+    # para TODO el cliente, compartidas por las N_REQUESTS (12) corrutinas.
+    limits = httpx.Limits(max_connections=POOL_SIZE, max_keepalive_connections=POOL_SIZE)
+    async with httpx.AsyncClient(timeout=BARE_TIMEOUT, limits=limits) as client:
+        return await _run_oleada(client, url)
+
+
+async def escenario_split(url):
+    # Ojo con el nombre repetido: &quot;pool&quot; aparece dos veces y son dos cosas
+    # distintas. `pool=SPLIT_POOL_TIMEOUT` (abajo, en httpx.Timeout) es un
+    # tiempo en SEGUNDOS -- cuanto esperar por una conexion libre antes de
+    # rendirse. `max_connections=POOL_SIZE` (en httpx.Limits, mas abajo) es
+    # una CANTIDAD -- cuantas conexiones simultaneas existen. Que ambas
+    # variables se llamen &quot;pool&quot; es solo como httpx nombro sus parametros, no
+    # una relacion real entre los dos numeros: se podria tener pool=1.0s con
+    # POOL_SIZE=3, o pool=5.0s con POOL_SIZE=1, son perillas independientes.
+    print(
+        f&quot;=== Escenario B: httpx.Timeout(connect={SPLIT_CONNECT_TIMEOUT}, &quot;
+        f&quot;read={SPLIT_READ_TIMEOUT}, write={SPLIT_WRITE_TIMEOUT}, &quot;
+        f&quot;pool={SPLIT_POOL_TIMEOUT}s [tiempo de espera]) -- pool corto a &quot;
+        f&quot;proposito, contra un pool de {POOL_SIZE} conexiones &quot;
+        f&quot;[max_connections, una cantidad distinta], {N_REQUESTS} requests &quot;
+        f&quot;concurrentes ===&quot;
+    )
+    timeout = httpx.Timeout(
+        connect=SPLIT_CONNECT_TIMEOUT,
+        read=SPLIT_READ_TIMEOUT,
+        write=SPLIT_WRITE_TIMEOUT,
+        pool=SPLIT_POOL_TIMEOUT,
+    )
+    # max_connections=POOL_SIZE: maximo POOL_SIZE (3) conexiones simultaneas
+    # para TODO el cliente, compartidas por las N_REQUESTS (12) corrutinas.
+    # El `pool=SPLIT_POOL_TIMEOUT` de arriba (1s) es el presupuesto que tiene
+    # CADA request para conseguir una de esas 3 conexiones compartidas -- no
+    # es &quot;1s repartido entre las 3&quot;, es &quot;1s de espera, y la conexion que te
+    # toque es cualquiera de esas 3 que se libere primero&quot;.
+    limits = httpx.Limits(max_connections=POOL_SIZE, max_keepalive_connections=POOL_SIZE)
+    async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
+        return await _run_oleada(client, url)
+
+
+async def main_async():
+    assert N_REQUESTS &gt; POOL_SIZE, &quot;el punto del demo es tener mas requests que conexiones&quot;
+    n_rondas = -(-N_REQUESTS // POOL_SIZE)  # ceil division
+    server = start_server()
+    port = server.server_address[1]
+    url = f&quot;http://127.0.0.1:{port}/&quot;
+    print(
+        f&quot;Servidor propio arriba en {url} (duerme {SLEEP_SECONDS}s por &quot;
+        f&quot;request). {N_REQUESTS} requests / pool de {POOL_SIZE} =&gt; &quot;
+        f&quot;{n_rondas} rondas.\n&quot;
+    )
+
+    _resultados_a, resumen_a = await escenario_bare_int(url)
+    # Con BARE_TIMEOUT=5, SLEEP_SECONDS=2, POOL_SIZE=3, N_REQUESTS=12: las
+    # rondas 1-3 (9 requests) esperan 0s/2s/4s por un slot, todo &lt; 5s =&gt; OK.
+    # La ronda 4 (3 requests) necesitaria esperar ~6s por un slot: supera los
+    # 5s =&gt; PoolTimeout real y explicito, cortado justo a los 5s.
+    ok_esperados = (n_rondas - 1) * POOL_SIZE
+    fallidos_esperados = N_REQUESTS - ok_esperados
+    assert resumen_a.get(&quot;ok&quot;, 0) == ok_esperados, (
+        f&quot;se esperaban {ok_esperados} OK en el escenario A, salieron {resumen_a.get(&#x27;ok&#x27;, 0)}&quot;
+    )
+    assert resumen_a.get(&quot;PoolTimeout&quot;, 0) == fallidos_esperados, (
+        f&quot;se esperaban {fallidos_esperados} PoolTimeout en el escenario A, &quot;
+        f&quot;salieron {resumen_a.get(&#x27;PoolTimeout&#x27;, 0)}&quot;
+    )
+    print(
+        f&quot;Confirmado: {ok_esperados} requests terminaron OK y {fallidos_esperados} &quot;
+        f&quot;cayeron en PoolTimeout -- pero los {fallidos_esperados} que fallaron lo &quot;
+        f&quot;hicieron marcados con el mismo numero ({BARE_TIMEOUT}s) que cualquier &quot;
+        f&quot;lectura lenta legitima tendria. Sin inspeccionar el tipo de excepcion &quot;
+        f&quot;(algo que un `except httpx.TimeoutException` generico no hace), un &quot;
+        f&quot;&#x27;timeout de ~{BARE_TIMEOUT:.0f}s&#x27; en los logs es ambiguo: no dice si el &quot;
+        f&quot;problema fue &#x27;no habia conexiones libres&#x27; (se arregla con mas &quot;
+        f&quot;`max_connections`) o &#x27;el downstream esta lento de verdad&#x27; (se arregla &quot;
+        f&quot;en el downstream) -- comparten el mismo presupuesto porque bare-int no &quot;
+        f&quot;deja darles numeros distintos.\n&quot;
+    )
+
+    _resultados_b, resumen_b = await escenario_split(url)
+    # Con SPLIT_POOL_TIMEOUT=1: la ronda 1 agarra los 3 slots en t=0 y los
+    # tiene ocupados hasta t=2 (SLEEP_SECONDS), porque el downstream tarda
+    # 2s en responder -- mas que el presupuesto de pool de 1s. Entonces
+    # ningun request de las rondas 2, 3 o 4 consigue un slot libre antes de
+    # que se les cumpla ese 1s de espera: los 9 caen en PoolTimeout casi al
+    # mismo tiempo (~1s), no escalonados como en el escenario A -- ninguno
+    # de ellos llega siquiera a &quot;necesitar&quot; esperar 2s/4s/6s, porque el
+    # reloj de pool ya los corto antes.
+    ok_esperados_b = POOL_SIZE
+    fallidos_esperados_b = N_REQUESTS - ok_esperados_b
+    assert resumen_b.get(&quot;ok&quot;, 0) == ok_esperados_b, (
+        f&quot;se esperaban {ok_esperados_b} OK en el escenario B, salieron {resumen_b.get(&#x27;ok&#x27;, 0)}&quot;
+    )
+    assert resumen_b.get(&quot;PoolTimeout&quot;, 0) == fallidos_esperados_b, (
+        f&quot;se esperaban {fallidos_esperados_b} PoolTimeout en el escenario B, &quot;
+        f&quot;salieron {resumen_b.get(&#x27;PoolTimeout&#x27;, 0)}&quot;
+    )
+    print(
+        f&quot;Confirmado: con el presupuesto de &#x27;pool&#x27; separado y corto &quot;
+        f&quot;({SPLIT_POOL_TIMEOUT:.0f}s), {ok_esperados_b} requests (la unica ronda &quot;
+        f&quot;que no tuvo que esperar) terminaron OK con su tiempo de lectura normal &quot;
+        f&quot;(~{SLEEP_SECONDS:.0f}s), y los otros {fallidos_esperados_b} fallaron &quot;
+        f&quot;rapido, a una escala de tiempo (~{SPLIT_POOL_TIMEOUT:.0f}s) totalmente &quot;
+        f&quot;distinta y mucho menor que la de un `read` lento real -- la magnitud &quot;
+        f&quot;misma de la falla ya dice &#x27;esto fue agotamiento de pool&#x27;, sin tocar &quot;
+        f&quot;para nada la paciencia (`read={SPLIT_READ_TIMEOUT:.0f}s`) que se le da &quot;
+        f&quot;a un downstream lento de verdad.&quot;
+    )
+
+    server.shutdown()
+
+
+def main():
+    asyncio.run(main_async())
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+      
+    <p class="section-label">Escenario A vs Escenario B — las "rondas" solo existen de verdad en A</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 780 250" class="diag" role="img" aria-label="Orden real de finalización en escenario A vs escenario B"><text x="10" y="10" class="diag-sub" font-size="10.5" style="text-anchor:start">tiempo → (izquierda = primero en terminar)</text><text x="10" y="45" class="diag-text" style="text-anchor:start">Escenario A</text><text x="10" y="60" class="diag-sub" style="text-anchor:start">bare-int, timeout=5s</text><rect x="150" y="15" width="140" height="45" rx="10" class="diag-box"/><text x="220.0" y="33" class="diag-text">Ronda 1</text><text x="220.0" y="49" class="diag-sub">3 req · espera 0s</text><rect x="310" y="15" width="140" height="45" rx="10" class="diag-box"/><text x="380.0" y="33" class="diag-text">Ronda 2</text><text x="380.0" y="49" class="diag-sub">3 req · espera 2s</text><rect x="470" y="15" width="140" height="45" rx="10" class="diag-box"/><text x="540.0" y="33" class="diag-text">Ronda 4</text><text x="540.0" y="49" class="diag-sub">3 req · espera 6s</text><rect x="630" y="15" width="140" height="45" rx="10" class="diag-box"/><text x="700.0" y="33" class="diag-text">Ronda 3</text><text x="700.0" y="49" class="diag-sub">3 req · espera 4s</text><rect x="150" y="68" width="140" height="42" rx="8" class="result-ok"/><text x="220.0" y="94" class="result-text" text-anchor="middle">OK ~2.0s</text><rect x="310" y="68" width="140" height="42" rx="8" class="result-ok"/><text x="380.0" y="94" class="result-text" text-anchor="middle">OK ~4.0s</text><rect x="470" y="68" width="140" height="42" rx="8" class="result-fail"/><text x="540.0" y="94" class="result-text" text-anchor="middle">PoolTimeout ~5.0s</text><rect x="630" y="68" width="140" height="42" rx="8" class="result-ok"/><text x="700.0" y="94" class="result-text" text-anchor="middle">OK ~6.0s</text><text x="10" y="175" class="diag-text" style="text-anchor:start">Escenario B</text><text x="10" y="190" class="diag-sub" style="text-anchor:start">pool separado, 1s</text><rect x="150" y="145" width="350" height="45" rx="10" class="diag-box"/><text x="325.0" y="163" class="diag-text">Rondas 2, 3 y 4</text><text x="325.0" y="179" class="diag-sub">9 req · nunca llegan a "esperar" 2s/4s/6s</text><rect x="520" y="145" width="140" height="45" rx="10" class="diag-box"/><text x="590.0" y="163" class="diag-text">Ronda 1</text><text x="590.0" y="179" class="diag-sub">3 req</text><rect x="150" y="198" width="350" height="42" rx="8" class="result-fail"/><text x="325.0" y="224" class="result-text" text-anchor="middle">PoolTimeout ~1.0s (casi simultáneo)</text><rect x="520" y="198" width="140" height="42" rx="8" class="result-ok"/><text x="590.0" y="224" class="result-text" text-anchor="middle">OK ~2.0s</text></svg></div>
+    
+
+      
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">pool: <b>3 conexiones</b></span><span class="badge">requests: <b>12</b></span></div>
+          <pre class="outterm">Servidor propio arriba (duerme 2.0s por request). 12 requests / pool de 3 =&gt; 4 rondas.</pre>
+          <p class="outnote">Con más requests que conexiones, van a formarse rondas: la primera arranca de inmediato, cada ronda siguiente espera a que la anterior libere conexión.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">ronda: <b>1 / 4</b></span><span class="badge">espera de pool: <b>0s</b></span></div>
+          <pre class="outterm">=== Escenario A: timeout=5.0 bare-int, pool de 3, 12 requests ===
+  [req-01..03] OK en ~2.0s (ronda 1, no esperaron nada)</pre>
+          <p class="outnote">Ronda 1 consigue slot de inmediato (t=0) y solo paga el tiempo de lectura real (2s).</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">ronda: <b>2-3 / 4</b></span><span class="badge">espera de pool: <b>2s, 4s</b></span></div>
+          <pre class="outterm">  [req-04..06] OK en ~4.0s (ronda 2, esperaron ~2s por un slot)
+  [req-07..09] OK en ~6.0s (ronda 3, esperaron ~4s por un slot)</pre>
+          <p class="outnote">Cada ronda adicional espera un <code>SLEEP_SECONDS</code> más que la anterior — pero esa espera, sola, todavía no supera el presupuesto bare de 5s.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">ronda: <b>4 / 4</b></span><span class="badge">resultado: <b>PoolTimeout</b></span></div>
+          <pre class="outterm">  [req-10..12] PoolTimeout en ~5.0s (necesitaban esperar ~6s -- excede el presupuesto de 5s)
+  resumen: {&#x27;ok&#x27;: 9, &#x27;PoolTimeout&#x27;: 3}</pre>
+          <p class="outnote">Recién la ronda 4 (que necesitaría esperar ~6s) supera el presupuesto de <code>pool</code> compartido con <code>read</code> — sale <code>PoolTimeout</code> cortado justo a los 5s, marcado con el <strong>mismo número</strong> que un read lento legítimo.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">ronda: <b>1 / 4</b></span></div>
+          <pre class="outterm">=== Escenario B: httpx.Timeout(pool=1.0s), pool de 3, 12 requests ===
+  [req-01..03] OK en ~2.0s (única ronda que no esperó nada)</pre>
+          <p class="outnote">Con el presupuesto de <code>pool</code> separado a 1s, solo la ronda que no tuvo que esperar nada sobrevive con su tiempo de lectura normal.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">rondas: <b>2-4 / 4</b></span><span class="badge">resultado: <b>PoolTimeout uniforme</b></span></div>
+          <pre class="outterm">  [req-04..12] PoolTimeout en ~1.0s (las 9 restantes, 3 rondas completas)
+  resumen: {&#x27;ok&#x27;: 3, &#x27;PoolTimeout&#x27;: 9}</pre>
+          <p class="outnote">Las 9 fallan casi al mismo instante, a una escala de tiempo (~1s) completamente distinta y mucho menor que la de un <code>read</code> lento real (~2s) — la magnitud misma ya delata agotamiento de pool, sin ambigüedad.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button><button class="outdot" data-i="5"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-06" data-index="6" role="tabpanel" aria-labelledby="tab-06">
+      <div class="panel-head">
+        <p class="kicker">Resiliencia</p>
+        <h2>Paso 6 &middot; Circuit breaker: CLOSED / OPEN / HALF_OPEN</h2>
+        <p class="tagline">Un failure_threshold astronómico nunca protege a nadie -- deja de importar si el breaker existe.</p>
+        <div class="chips"><span class="chip">can_execute / on_success / on_failure</span><span class="chip">failure_threshold</span><span class="chip">recovery_timeout</span><span class="chip">fail fast</span></div>
+      </div>
+
+      <div class="diagram-wrap">
+<svg viewBox="0 0 720 220" role="img" aria-label="Diagrama de estados del circuit breaker" class="diag fsm">
+  <defs>
+    <marker id="arrow-06" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/>
+    </marker>
+  </defs>
+  <circle cx="110" cy="110" r="70" class="fsm-node fsm-closed"/>
+  <text x="110" y="105" class="fsm-label">CLOSED</text>
+  <text x="110" y="126" class="fsm-sub">deja pasar todo</text>
+
+  <circle cx="610" cy="110" r="70" class="fsm-node fsm-open"/>
+  <text x="610" y="105" class="fsm-label">OPEN</text>
+  <text x="610" y="126" class="fsm-sub">corta local, sin red</text>
+
+  <circle cx="360" cy="185" r="60" class="fsm-node fsm-half"/>
+  <text x="360" y="182" class="fsm-label" font-size="20">HALF_OPEN</text>
+  <text x="360" y="200" class="fsm-sub">1 request de prueba</text>
+
+  <path d="M180,95 C 320,60 400,60 540,95" class="diag-arrow" marker-end="url(#arrow-06)"/>
+  <text x="360" y="55" class="diag-arrow-label" text-anchor="middle">failure_count &gt;= failure_threshold</text>
+
+  <path d="M540,150 C 470,175 430,178 428,178" class="diag-arrow" marker-end="url(#arrow-06)"/>
+  <text x="500" y="205" class="diag-arrow-label" text-anchor="middle">pasó recovery_timeout</text>
+
+  <path d="M300,155 C 220,120 170,110 145,105" class="diag-arrow" marker-end="url(#arrow-06)"/>
+  <text x="230" y="150" class="diag-arrow-label" text-anchor="middle">on_success()</text>
+
+  <path d="M420,160 C 500,140 560,130 575,120" class="diag-arrow diag-arrow-fail" marker-end="url(#arrow-06)"/>
+  <text x="530" y="170" class="diag-arrow-label" text-anchor="middle">on_failure()</text>
+</svg>
+</div>
+
+      <div class="callout">
+        <p class="callout-title">A quién protege el breaker</p>
+        <p>Es fácil pensar que el circuit breaker protege al downstream — y de rebote lo
+            hace, dándole aire para recuperarse sin tráfico nuevo encima. Pero a quién protege
+            <em>directamente</em> es al que llama: cada request cortado en OPEN se resuelve en
+            microsegundos localmente, en vez de gastar el presupuesto entero de timeout (los pasos
+            04/05) contra un servicio que ya se sabe que va a fallar.</p>
+      </div>
+
+      <div class="prose">
+        
+        <p>La máquina de tres estados es corta (menos de 30 líneas) pero vale la pena leerla con
+        calma porque es el patrón exacto que usan implementaciones de producción como Hystrix o
+        resilience4j, solo que simplificado a lo esencial:</p>
+        <ul>
+          <li><strong>CLOSED</strong> (estado inicial): deja pasar todo. Cada fallo suma
+          <code>failure_count</code>; cualquier éxito lo resetea a 0 de inmediato.</li>
+          <li><strong>OPEN</strong>: en cuanto <code>failure_count &gt;= failure_threshold</code>.
+          <code>can_execute()</code> devuelve <code>False</code> sin tocar la red — cero bytes hacia
+          el downstream — hasta que pasen <code>recovery_timeout</code> segundos desde el último
+          fallo.</li>
+          <li><strong>HALF_OPEN</strong>: pasado ese tiempo, se deja pasar <em>un</em> request de
+          prueba. Si sale bien, vuelta a CLOSED con el contador en 0; si sale mal, vuelve a sumar y
+          puede reabrir.</li>
+        </ul>
+        <p>El experimento de la demo es deliberadamente aburrido de leer y por eso es contundente:
+        el <em>único</em> parámetro que cambia entre escenario A y B es <code>failure_threshold</code>
+        (999999 vs 3) — ni el downstream, ni el cliente HTTP, ni la lógica de llamada cambian en
+        absoluto. Con el umbral astronómico, el breaker existe en el código pero, en la práctica,
+        es idéntico a no tener ninguno.</p>
+        <p>Un matiz importante para cuando esto se combine con retries/backoff más adelante: cada
+        intento fallido <em>dentro</em> de un mismo request ya cuenta como su propio
+        <code>on_failure()</code>. Por eso <code>call_downstream()</code> aquí hace <strong>un solo
+        intento</strong> por llamada, sin retries: para ver exactamente qué hace el breaker por sí
+        solo, sin ese segundo mecanismo mezclado.</p>
+        <p>También vale la pena notar qué es lo que este breaker <em>no</em> hace, comparado con
+        implementaciones más sofisticadas: resetea <code>failure_count</code> a 0 con un solo
+        <code>on_success()</code>, en vez de usar una ventana deslizante de tasa de error — el
+        precio de la simplicidad de "contar fallos seguidos" en vez de "medir tasa de error en una
+        ventana de tiempo".</p>
+        
+      </div>
+
+      
+      <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 6: CircuitBreaker (CLOSED / OPEN / HALF_OPEN) -- comparar un breaker que nunca abre contra uno que si protege al downstream.</p>
+        <pre class="instr-code">python3 06_circuit_breaker.py</pre>
+      </div>
+    
+
+      <details class="code-details" open>
+        <summary>Ver <code>06_circuit_breaker.py</code> completo (187 líneas)</summary>
+        <pre class="code-block"><code class="language-python">import http.server
+import os
+import threading
+import time
+import urllib.error
+import urllib.request
+
+FAILURE_THRESHOLD_BAD = int(os.environ.get(&quot;FAILURE_THRESHOLD_BAD&quot;, &quot;999999&quot;))
+FAILURE_THRESHOLD_GOOD = int(os.environ.get(&quot;FAILURE_THRESHOLD_GOOD&quot;, &quot;3&quot;))
+RECOVERY_TIMEOUT = float(os.environ.get(&quot;RECOVERY_TIMEOUT&quot;, &quot;2&quot;))
+N_REQUESTS = int(os.environ.get(&quot;N_REQUESTS&quot;, &quot;10&quot;))
+
+
+class CircuitBreaker:
+    def __init__(self, failure_threshold: int = 1, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = 0
+        self.state = &quot;CLOSED&quot;  # CLOSED, OPEN, HALF_OPEN
+
+    def can_execute(self) -&gt; bool:
+        current_time = time.time()
+        if self.state == &quot;CLOSED&quot;:
+            return True
+        elif self.state == &quot;OPEN&quot;:
+            if current_time - self.last_failure_time &gt;= self.recovery_timeout:
+                self.state = &quot;HALF_OPEN&quot;
+                return True
+            return False
+        else:  # HALF_OPEN
+            return True
+
+    def on_success(self):
+        self.failure_count = 0
+        self.state = &quot;CLOSED&quot;
+
+    def on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count &gt;= self.failure_threshold:
+            self.state = &quot;OPEN&quot;
+
+
+class DownstreamState:
+    &quot;&quot;&quot;Estado compartido del downstream propio: cuantos requests recibio en
+    total, y si en este momento esta &quot;enfermo&quot; (500) o &quot;sano&quot; (200).&quot;&quot;&quot;
+
+    def __init__(self):
+        self.healthy = False
+        self.total_requests = 0
+
+
+def make_handler(state):
+    class FlakyHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            state.total_requests += 1
+            if state.healthy:
+                body = b&quot;ok&quot;
+                self.send_response(200)
+            else:
+                body = b&quot;error&quot;
+                self.send_response(500)
+            self.send_header(&quot;Content-Length&quot;, str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format, *args):
+            pass  # silenciar el log default de http.server, ensuciaria la demo
+
+    return FlakyHandler
+
+
+def start_server(state):
+    server = http.server.ThreadingHTTPServer((&quot;127.0.0.1&quot;, 0), make_handler(state))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
+def call_downstream(breaker, url):
+    &quot;&quot;&quot;Una sola llamada, sin retries -- ver el docstring del modulo sobre por
+    que se deja afuera el loop de reintentos del original.&quot;&quot;&quot;
+    if not breaker.can_execute():
+        return &quot;short_circuited&quot;
+
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            status = resp.status
+    except urllib.error.HTTPError as e:
+        status = e.code
+
+    if status &gt;= 500:
+        breaker.on_failure()
+        return &quot;downstream_error&quot;
+
+    breaker.on_success()
+    return &quot;ok&quot;
+
+
+def escenario_a_nunca_abre(url, state):
+    print(f&quot;=== Escenario A: CircuitBreaker(failure_threshold={FAILURE_THRESHOLD_BAD}) ===&quot;)
+    state.healthy = False
+    state.total_requests = 0
+    breaker = CircuitBreaker(failure_threshold=FAILURE_THRESHOLD_BAD)
+
+    resultados = []
+    for i in range(N_REQUESTS):
+        resultado = call_downstream(breaker, url)
+        resultados.append(resultado)
+        print(f&quot;  request-{i + 1:02d}: {resultado} (breaker.state={breaker.state})&quot;)
+
+    print(f&quot;  downstream.total_requests = {state.total_requests}&quot;)
+    assert resultados.count(&quot;downstream_error&quot;) == N_REQUESTS
+    assert state.total_requests == N_REQUESTS
+    assert breaker.state == &quot;CLOSED&quot;
+    print(
+        f&quot;Confirmado: los {N_REQUESTS} requests tocaron de verdad al downstream y &quot;
+        f&quot;fallaron los {N_REQUESTS} -- con failure_threshold={FAILURE_THRESHOLD_BAD}, &quot;
+        f&quot;failure_count nunca alcanza el umbral, asi que el breaker se queda CLOSED &quot;
+        f&quot;para siempre y sigue mandando trafico a un downstream que ya demostro que &quot;
+        f&quot;esta caido.\n&quot;
+    )
+
+
+def escenario_b_abre_y_protege(url, state):
+    print(f&quot;=== Escenario B: CircuitBreaker(failure_threshold={FAILURE_THRESHOLD_GOOD}) ===&quot;)
+    state.healthy = False
+    state.total_requests = 0
+    breaker = CircuitBreaker(
+        failure_threshold=FAILURE_THRESHOLD_GOOD, recovery_timeout=RECOVERY_TIMEOUT
+    )
+
+    resultados = []
+    for i in range(N_REQUESTS):
+        resultado = call_downstream(breaker, url)
+        resultados.append(resultado)
+        print(f&quot;  request-{i + 1:02d}: {resultado} (breaker.state={breaker.state})&quot;)
+
+    print(f&quot;  downstream.total_requests = {state.total_requests}&quot;)
+    assert resultados.count(&quot;downstream_error&quot;) == FAILURE_THRESHOLD_GOOD
+    assert resultados.count(&quot;short_circuited&quot;) == N_REQUESTS - FAILURE_THRESHOLD_GOOD
+    assert state.total_requests == FAILURE_THRESHOLD_GOOD
+    assert breaker.state == &quot;OPEN&quot;
+    print(
+        f&quot;Confirmado: solo los primeros {FAILURE_THRESHOLD_GOOD} requests tocaron al &quot;
+        f&quot;downstream (y fallaron); en cuanto failure_count llego a &quot;
+        f&quot;{FAILURE_THRESHOLD_GOOD} el breaker abrio, y los &quot;
+        f&quot;{N_REQUESTS - FAILURE_THRESHOLD_GOOD} requests restantes se cortaron LOCAL &quot;
+        f&quot;-- el downstream no vio ni uno mas.\n&quot;
+    )
+
+    print(
+        f&quot;--- Recuperacion: esperando {RECOVERY_TIMEOUT:.0f}s (recovery_timeout) y &quot;
+        f&quot;marcando el downstream como sano ---&quot;
+    )
+    time.sleep(RECOVERY_TIMEOUT + 0.1)
+    state.healthy = True
+
+    resultado = call_downstream(breaker, url)
+    print(f&quot;  request de prueba tras recovery_timeout: {resultado} (breaker.state={breaker.state})&quot;)
+    assert resultado == &quot;ok&quot;
+    assert breaker.state == &quot;CLOSED&quot;
+    assert breaker.failure_count == 0
+    print(
+        &quot;Confirmado: pasado recovery_timeout, can_execute() dejo pasar UN request de &quot;
+        &quot;prueba (HALF_OPEN); como el downstream ya respondia 200, ese request &quot;
+        &quot;disparo on_success() y el breaker volvio a CLOSED con el contador en 0.&quot;
+    )
+
+
+def main():
+    state = DownstreamState()
+    server = start_server(state)
+    port = server.server_address[1]
+    url = f&quot;http://127.0.0.1:{port}/&quot;
+    print(f&quot;Downstream propio arriba en {url} (arranca &#x27;enfermo&#x27;, responde 500).\n&quot;)
+
+    escenario_a_nunca_abre(url, state)
+    escenario_b_abre_y_protege(url, state)
+
+    server.shutdown()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+
+    <p class="section-label">Qué le pasa a cada request, según el escenario</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 780 200" class="diag" role="img" aria-label="Resultado de los 10 requests en escenario A vs escenario B"><text x="10" y="35" class="diag-text" style="text-anchor:start">Escenario A</text><text x="10" y="50" class="diag-sub" style="text-anchor:start">threshold=999999</text><rect x="150" y="8" width="620" height="40" rx="10" class="diag-box"/><text x="460.0" y="26" class="diag-text">10 de 10 requests</text><text x="460.0" y="42" class="diag-sub">todos tocan el downstream, uno por uno</text><rect x="150" y="54" width="620" height="40" rx="8" class="result-fail"/><text x="460.0" y="79" class="result-text" text-anchor="middle">downstream_error ×10 · breaker sigue CLOSED para siempre</text><text x="10" y="135" class="diag-text" style="text-anchor:start">Escenario B</text><text x="10" y="150" class="diag-sub" style="text-anchor:start">threshold=3, recovery=2s</text><rect x="150" y="108" width="130" height="40" rx="10" class="diag-box"/><text x="215.0" y="126" class="diag-text">req 1-3</text><text x="215.0" y="142" class="diag-sub">tocan downstream</text><rect x="290" y="108" width="330" height="40" rx="10" class="diag-box"/><text x="455.0" y="126" class="diag-text">req 4-10 (7)</text><text x="455.0" y="142" class="diag-sub">breaker ya está OPEN</text><rect x="630" y="108" width="140" height="40" rx="10" class="diag-box" style="stroke-dasharray:4 3"/><text x="700.0" y="126" class="diag-text">tras recovery</text><text x="700.0" y="142" class="diag-sub">1 request de prueba</text><rect x="150" y="154" width="130" height="40" rx="8" class="result-fail"/><text x="215.0" y="179" class="result-text" text-anchor="middle">downstream_error</text><rect x="290" y="154" width="330" height="40" rx="8" class="result-ok"/><text x="455.0" y="179" class="result-text" text-anchor="middle">short_circuited (0 bytes)</text><rect x="630" y="154" width="140" height="40" rx="8" class="result-ok"/><text x="700.0" y="179" class="result-text" text-anchor="middle">OK → CLOSED</text></svg></div>
+
+
+
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">breaker.state: <b>CLOSED</b></span></div>
+          <pre class="outterm">Downstream propio arriba (arranca &#x27;enfermo&#x27;, responde 500).
+=== Escenario A: CircuitBreaker(failure_threshold=999999) ===</pre>
+          <p class="outnote">Mismo downstream stdlib de los escenarios anteriores, ahora respondiendo 500 al instante mientras está "enfermo" — sin dormir, el punto no es la latencia sino cuántas veces se le sigue pegando.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">breaker.state: <b>CLOSED (nunca cambia)</b></span><span class="badge">total_requests: <b>10</b></span></div>
+          <pre class="outterm">  request-01: downstream_error (breaker.state=CLOSED)
+  ... (request-02 .. request-10, las 10 iguales) ...
+  downstream.total_requests = 10</pre>
+          <p class="outnote">Con un umbral astronómico, <code>failure_count</code> nunca lo alcanza — los 10 requests tocan de verdad al downstream y fallan los 10.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">breaker.state: <b>CLOSED → OPEN</b></span><span class="badge">failure_count: <b>3</b></span></div>
+          <pre class="outterm">=== Escenario B: CircuitBreaker(failure_threshold=3) ===
+  request-01: downstream_error (breaker.state=CLOSED)
+  request-02: downstream_error (breaker.state=CLOSED)
+  request-03: downstream_error (breaker.state=OPEN)</pre>
+          <p class="outnote">Al tercer fallo consecutivo, <code>failure_count</code> llega al umbral y el breaker abre — recién ahí, no antes.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">breaker.state: <b>OPEN</b></span><span class="badge">total_requests: <b>3 (congelado)</b></span></div>
+          <pre class="outterm">  request-04: short_circuited (breaker.state=OPEN)
+  ... (request-05 .. request-10, las 7 iguales) ...
+  downstream.total_requests = 3</pre>
+          <p class="outnote">Los 7 requests restantes se cortan <strong>local</strong>, sin generar ni un byte de tráfico — <code>total_requests</code> del downstream queda congelado en 3 para siempre, sin importar cuántos mensajes más lleguen.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">breaker.state: <b>OPEN → HALF_OPEN → CLOSED</b></span><span class="badge">failure_count: <b>0</b></span></div>
+          <pre class="outterm">--- Recuperacion: esperando 2s (recovery_timeout) y marcando el downstream como sano ---
+  request de prueba tras recovery_timeout: ok (breaker.state=CLOSED)</pre>
+          <p class="outnote">Pasado <code>recovery_timeout</code>, <code>can_execute()</code> deja pasar UN request de prueba (HALF_OPEN). Como el downstream ya respondía 200, ese request dispara <code>on_success()</code> y el breaker vuelve a CLOSED con el contador en 0 — cierra el ciclo completo de los tres estados.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    
+    </section>
+    
+
+    <section class="panel" id="panel-07" data-index="7" role="tabpanel" aria-labelledby="tab-07">
+      <div class="panel-head">
+        <p class="kicker">Integración</p>
+        <h2>Paso 7 &middot; Worker slots (semaphore) + prefetch + HTTP lento</h2>
+        <p class="tagline">Donde todo lo anterior se junta: "queued sube, in_flight tope en N, queued baja de a N" -- el mecanismo real de la congestión.</p>
+        <div class="chips"><span class="chip">WORKER_CONCURRENCY</span><span class="chip">prefetch_count=1</span><span class="chip">ack manual (acks_late)</span><span class="chip">in_flight</span></div>
+      </div>
+
+      <div class="diagram-wrap"><svg viewBox="0 0 750 180" class="diag" role="img" aria-label="Cola RabbitMQ empujando hasta N mensajes a la vez a un downstream lento"><defs><marker id="arrow-07-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="diag-arrowhead"/></marker></defs><rect x="20" y="60" width="160" height="65" rx="12" class="diag-box"/><text x="100.0" y="86" class="diag-text">step7_queue</text><text x="100.0" y="106" class="diag-sub">Ready: 12</text><rect x="290" y="15" width="190" height="145" rx="12" class="diag-box diag-box-accent"/><text x="385.0" y="39" class="diag-text">N workers</text><text x="385.0" y="56" class="diag-sub">prefetch_count=1 c/u</text><rect x="320" y="90" width="130" height="50" rx="12" class="diag-box"/><text x="385.0" y="109" class="diag-text">in_flight</text><text x="385.0" y="128" class="diag-sub">tope en N</text><rect x="580" y="60" width="150" height="65" rx="12" class="diag-box"/><text x="655.0" y="86" class="diag-text">Downstream</text><text x="655.0" y="106" class="diag-sub">duerme 1.0s</text><path d="M180,92 L290,92" class="diag-arrow" marker-end="url(#arrow-07-flow)"/><text x="235" y="77" class="diag-arrow-label" text-anchor="middle">push (hasta N)</text><path d="M480,80 L580,80" class="diag-arrow" marker-end="url(#arrow-07-flow)"/><text x="530" y="70" class="diag-arrow-label" text-anchor="middle">client.get()</text><path d="M580,112 L480,112" class="diag-arrow" marker-end="url(#arrow-07-flow)"/><text x="530" y="133" class="diag-arrow-label" text-anchor="middle">responde → ack</text></svg></div>
+
+      <div class="callout">
+        <p class="callout-title">WORKER_CONCURRENCY no es lo mismo que prefetch_count</p>
+        <p>Es fácil confundirlos porque los dos limitan "cuánto a la vez". <code>prefetch_count</code>
+            (paso 03) es cuántos mensajes <em>sin confirmar</em> puede tener <strong>un solo</strong>
+            consumer -- lo hace cumplir RabbitMQ. <code>WORKER_CONCURRENCY</code> es cuántos
+            <strong>consumers</strong> existen en total -- eso lo decide nuestro propio código
+            (acá, cuántos hilos lanzamos). En este paso cada worker usa
+            <code>prefetch_count=1</code> fijo; lo que cambia entre escenarios es
+            <strong>cuántos workers hay</strong>, no su prefetch individual -- exactamente como
+            Celery: <code>worker_prefetch_multiplier=1 × --concurrency=N</code>.</p>
+      </div>
+
+      <div class="prose">
+        <p>Los pasos 02 y 03 mostraron RabbitMQ por sí solo: <code>basic_qos</code> como válvula de
+        entrega y <code>basic_ack</code> manual como confirmación. Los pasos 04-06 mostraron el
+        cliente HTTP por sí solo: timeout partido, pool de conexiones, circuit breaker. Este paso no
+        agrega ningún concepto nuevo del lado HTTP -- combina lo ya visto para mostrar el mecanismo
+        que faltaba: qué pasa cuando <em>cada mensaje ocupa un worker entero mientras dura la llamada
+        downstream</em>.</p>
+        <p>Cada uno de los <code>WORKER_CONCURRENCY</code> hilos es, a efectos prácticos, un
+        "proceso Celery" con <code>concurrency=1</code>: su propia <code>pika.BlockingConnection</code>
+        (pika no es thread-safe), su propio <code>httpx.Client</code>, y <code>prefetch_count=1</code>
+        -- nunca tiene más de un mensaje sin confirmar. El <code>basic_ack</code> se dispara recién
+        <strong>después</strong> de que <code>client.get()</code> vuelve, no antes -- eso es
+        <code>task_acks_late=True</code>: el mensaje sigue "en juego" (unacked, ocupando ese slot)
+        durante toda la llamada lenta, no solo mientras Rabbit lo entrega.</p>
+        <p>Un loop de monitoreo en el hilo principal consulta
+        <code>queue_declare(passive=True).method.message_count</code> cada ~0.3s -- eso cuenta
+        mensajes <strong>Ready</strong> (todavía en la cola, nadie los tomó), no los que ya están
+        unacked en manos de algún worker. Combinado con un contador local de <code>in_flight</code>,
+        la salida en vivo muestra exactamente la frase del <code>RUNBOOK.md</code>: "queued sube,
+        in_flight tope en N, queued baja de a N".</p>
+        <p>Con <code>WORKER_CONCURRENCY=1</code> (Escenario A) el procesamiento es enteramente serial
+        -- 12 mensajes, de a uno, sin importar que el downstream pudiera atender varios en paralelo.
+        Con <code>WORKER_CONCURRENCY=3</code> (Escenario B), <code>in_flight</code> sube hasta 3 y se
+        queda ahí: 4 "rondas" de 3, el mismo patrón de rondas del paso 05, pero ahora la razón del
+        límite no es un pool de HTTP -- es la cantidad de workers que decidimos lanzar.</p>
+      </div>
+
+
+    <p class="section-label">Instrucciones</p>
+      <div class="instructions-wrap">
+        <p class="instr-lead">Paso 7: WORKER_CONCURRENCY como semaphore -- N hilos consumer (basic_qos(prefetch_count=1) + ack manual) llamando a un downstream HTTP lento con el timeout partido bueno.</p>
+        <pre class="instr-code">docker compose up -d
+pip install -r requirements.txt   # ya incluye httpx
+python3 07_worker_slots.py</pre>
+      </div>
+
+      <details class="code-details" open>
+        <summary>Ver <code>07_worker_slots.py</code> completo (219 líneas)</summary>
+        <pre class="code-block"><code class="language-python">&quot;&quot;&quot;
+Paso 7: WORKER_CONCURRENCY como semaphore -- N hilos consumer
+(basic_qos(prefetch_count=1) + ack manual, pasos 02-03) llamando a un
+downstream HTTP lento con el timeout partido bueno (leccion del paso 04):
+nunca hay mas de N mensajes &quot;in_flight&quot; a la vez, sin importar cuantos queden
+esperando (Ready) en la cola.
+
+Como probar:
+
+    docker compose up -d
+    pip install -r requirements.txt   # ya incluye httpx
+    python3 07_worker_slots.py
+&quot;&quot;&quot;
+
+import http.server
+import os
+import threading
+import time
+
+import httpx
+import pika
+
+QUEUE_NAME = &quot;step7_queue&quot;
+SLEEP_SECONDS = float(os.environ.get(&quot;SLEEP_SECONDS&quot;, &quot;1&quot;))
+N_MESSAGES = int(os.environ.get(&quot;N_MESSAGES&quot;, &quot;12&quot;))
+WORKER_CONCURRENCY_A = int(os.environ.get(&quot;WORKER_CONCURRENCY_A&quot;, &quot;1&quot;))
+WORKER_CONCURRENCY_B = int(os.environ.get(&quot;WORKER_CONCURRENCY_B&quot;, &quot;3&quot;))
+
+RABBITMQ_HOST = os.environ.get(&quot;RABBITMQ_HOST&quot;, &quot;localhost&quot;)
+RABBITMQ_PORT = int(os.environ.get(&quot;RABBITMQ_PORT&quot;, &quot;5672&quot;))
+
+# Timeout partido &quot;bueno&quot; (leccion del paso 04) -- no es el foco de este paso,
+# solo evita que el HTTP client en si mismo sea la variable que confunde la
+# demo. pool=1 no importa aca: cada worker usa su propio httpx.Client, un solo
+# request a la vez, sin compartir pool con nadie (eso es el paso 05).
+HTTP_TIMEOUT = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=1.0)
+
+
+class SlowHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        time.sleep(SLEEP_SECONDS)  # simula &quot;el downstream tarda&quot;
+        body = b&quot;ok&quot;
+        self.send_response(200)
+        self.send_header(&quot;Content-Length&quot;, str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass  # silenciar el log default de http.server, ensuciaria la demo
+
+
+def start_server():
+    server = http.server.ThreadingHTTPServer((&quot;127.0.0.1&quot;, 0), SlowHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
+def _connect():
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT)
+    )
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME)
+    return connection, channel
+
+
+def _purge():
+    connection, channel = _connect()
+    channel.queue_purge(queue=QUEUE_NAME)
+    connection.close()
+
+
+def _publish(n):
+    connection, channel = _connect()
+    for i in range(1, n + 1):
+        channel.basic_publish(exchange=&quot;&quot;, routing_key=QUEUE_NAME, body=f&quot;msg-{i}&quot;)
+    connection.close()
+    print(f&quot;{n} mensajes publicados.&quot;)
+
+
+class InFlight:
+    &quot;&quot;&quot;Contador compartido entre los N hilos worker -- cuantos mensajes estan
+    siendo procesados (unacked) en este instante, y el maximo que se alcanzo
+    en toda la corrida.&quot;&quot;&quot;
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._value = 0
+        self.max_seen = 0
+
+    def incr(self):
+        with self._lock:
+            self._value += 1
+            self.max_seen = max(self.max_seen, self._value)
+            return self._value
+
+    def decr(self):
+        with self._lock:
+            self._value -= 1
+
+    @property
+    def value(self):
+        with self._lock:
+            return self._value
+
+
+def _worker(worker_id, url, in_flight, procesados, total_esperado, deadline):
+    &quot;&quot;&quot;Un &#x27;proceso Celery&#x27; con concurrency=1: su propia connection de pika
+    (no es thread-safe: cada connection solo se puede usar desde el hilo que
+    la creo) y su propio httpx.Client, prefetch_count=1 -- nunca tiene mas de
+    1 mensaje sin confirmar a la vez.&quot;&quot;&quot;
+    connection, channel = _connect()
+    channel.basic_qos(prefetch_count=1)
+    client = httpx.Client(timeout=HTTP_TIMEOUT)
+
+    def on_message(ch, method_frame, header_frame, body):
+        n = in_flight.incr()
+        client.get(url)  # la llamada lenta -- el mensaje sigue unacked mientras dura
+        in_flight.decr()
+        ch.basic_ack(delivery_tag=method_frame.delivery_tag)  # acks_late: recien aca
+        procesados.append(body.decode())
+        print(f&quot;  [worker-{worker_id}] proceso {body.decode()!r} (in_flight llego a {n})&quot;)
+
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=on_message)
+
+    # Loop manual (en vez de start_consuming) para poder parar cuando ya se
+    # proceso todo lo esperado, sin bloquear para siempre.
+    while time.monotonic() &lt; deadline:
+        if len(procesados) &gt;= total_esperado:
+            break
+        connection.process_data_events(time_limit=0.2)
+
+    client.close()
+    connection.close()
+
+
+def _run_escenario(nombre, worker_concurrency, url):
+    print(f&quot;=== {nombre}: WORKER_CONCURRENCY={worker_concurrency} ===&quot;)
+    _purge()
+    in_flight = InFlight()
+    procesados = []
+    deadline = time.monotonic() + N_MESSAGES * SLEEP_SECONDS + 15
+
+    workers = [
+        threading.Thread(
+            target=_worker,
+            args=(i + 1, url, in_flight, procesados, N_MESSAGES, deadline),
+        )
+        for i in range(worker_concurrency)
+    ]
+    for w in workers:
+        w.start()
+    time.sleep(0.5)  # asegurar que todos ya esten suscritos con su prefetch aplicado
+
+    _publish(N_MESSAGES)
+
+    # Connection propia, solo para consultar cuantos mensajes quedan &quot;Ready&quot;
+    # en la cola (queue_declare(passive=True)) -- no cuenta los unacked que
+    # ya tiene algun worker en mano, esos ya no son &quot;queued&quot;.
+    monitor_connection, monitor_channel = _connect()
+    inicio = time.monotonic()
+    last_print = -1.0
+    while len(procesados) &lt; N_MESSAGES and time.monotonic() &lt; deadline:
+        ready = monitor_channel.queue_declare(queue=QUEUE_NAME, passive=True).method.message_count
+        elapsed = time.monotonic() - inicio
+        if elapsed - last_print &gt;= 0.3:
+            print(
+                f&quot;    t={elapsed:5.1f}s  queued(ready)={ready:2d}  &quot;
+                f&quot;in_flight={in_flight.value}/{worker_concurrency}  &quot;
+                f&quot;procesados={len(procesados):2d}/{N_MESSAGES}&quot;
+            )
+            last_print = elapsed
+        time.sleep(0.1)
+    monitor_connection.close()
+
+    for w in workers:
+        w.join()
+
+    print(f&quot;  max in_flight observado: {in_flight.max_seen}&quot;)
+    assert len(procesados) == N_MESSAGES, (
+        f&quot;se esperaban {N_MESSAGES} procesados, salieron {len(procesados)}&quot;
+    )
+    assert in_flight.max_seen == worker_concurrency, (
+        f&quot;se esperaba que in_flight llegara a {worker_concurrency}, &quot;
+        f&quot;llego a {in_flight.max_seen}&quot;
+    )
+    print()
+
+
+def main():
+    server = start_server()
+    port = server.server_address[1]
+    url = f&quot;http://127.0.0.1:{port}/&quot;
+    print(f&quot;Downstream propio arriba en {url} (duerme {SLEEP_SECONDS}s por request).\n&quot;)
+
+    _run_escenario(&quot;Escenario A&quot;, WORKER_CONCURRENCY_A, url)
+    print(
+        f&quot;Confirmado: con WORKER_CONCURRENCY={WORKER_CONCURRENCY_A}, in_flight nunca &quot;
+        f&quot;pasa de {WORKER_CONCURRENCY_A} -- los demas mensajes esperan su turno en la &quot;
+        f&quot;cola (Ready), de a uno, aunque el downstream pudiera atender varios en &quot;
+        f&quot;paralelo.\n&quot;
+    )
+
+    _run_escenario(&quot;Escenario B&quot;, WORKER_CONCURRENCY_B, url)
+    print(
+        f&quot;Confirmado: con WORKER_CONCURRENCY={WORKER_CONCURRENCY_B}, in_flight sube &quot;
+        f&quot;hasta {WORKER_CONCURRENCY_B} y se mantiene ahi -- &#x27;queued sube, in_flight &quot;
+        f&quot;tope en N, queued baja de a N&#x27;, el mecanismo real de la congestion, &quot;
+        f&quot;reconstruido con basic_qos(prefetch_count=1) x{WORKER_CONCURRENCY_B} + ack &quot;
+        f&quot;manual + un cliente HTTP con timeout partido -- sin Celery ni Postgres de &quot;
+        f&quot;por medio.&quot;
+    )
+
+    server.shutdown()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+      </details>
+
+
+    <p class="section-label">in_flight máximo alcanzado, según el escenario</p>
+    <div class="diagram-wrap"><svg viewBox="0 0 720 190" class="diag" role="img" aria-label="in_flight maximo alcanzado en escenario A vs escenario B"><text x="10" y="32" class="diag-text" style="text-anchor:start">Escenario A</text><text x="10" y="47" class="diag-sub" style="text-anchor:start">WORKER_CONCURRENCY=1</text><rect x="150" y="8" width="400" height="40" rx="10" class="diag-box"/><text x="350.0" y="26" class="diag-text">12 mensajes</text><text x="350.0" y="42" class="diag-sub">procesados de a uno</text><rect x="150" y="54" width="400" height="38" rx="8" class="result-fail"/><text x="350.0" y="78" class="result-text" text-anchor="middle">in_flight máx = 1 (~12s en total)</text><text x="10" y="128" class="diag-text" style="text-anchor:start">Escenario B</text><text x="10" y="143" class="diag-sub" style="text-anchor:start">WORKER_CONCURRENCY=3</text><rect x="150" y="104" width="400" height="40" rx="10" class="diag-box"/><text x="350.0" y="122" class="diag-text">12 mensajes</text><text x="350.0" y="138" class="diag-sub">4 rondas de 3</text><rect x="150" y="150" width="400" height="38" rx="8" class="result-ok"/><text x="350.0" y="174" class="result-text" text-anchor="middle">in_flight máx = 3 (~4s en total)</text></svg></div>
+
+    <div class="outputs-section">
+      <p class="section-label">Salida paso a paso</p>
+      <div class="outsteps">
+        <div class="outstep">
+          <div class="outbadges"><span class="badge">Escenario A</span><span class="badge">Ready: <b>12</b></span></div>
+          <pre class="outterm">Downstream propio arriba en http://127.0.0.1:32879/ (duerme 1.0s por request).
+
+=== Escenario A: WORKER_CONCURRENCY=1 ===
+12 mensajes publicados.</pre>
+          <p class="outnote">Arranca el downstream propio (<code>ThreadingHTTPServer</code>) y se publican los 12 mensajes de una sola vez -- todavía nadie los tomó, Ready=12.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>11</b></span><span class="badge">in_flight: <b>1/1</b></span><span class="badge">Procesados: <b>0/12</b></span></div>
+          <pre class="outterm">    t=  0.0s  queued(ready)=11  in_flight=1/1  procesados= 0/12</pre>
+          <p class="outnote">El único worker ya tomó el primer mensaje (Ready bajó de 12 a 11) y lo tiene in_flight -- todavía no terminó la llamada HTTP de 1s, así que procesados sigue en 0.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>10</b></span><span class="badge">in_flight: <b>1/1</b></span><span class="badge">Procesados: <b>1/12</b></span></div>
+          <pre class="outterm">  [worker-1] proceso 'msg-1' (in_flight llego a 1)
+    t=  1.2s  queued(ready)=10  in_flight=1/1  procesados= 1/12</pre>
+          <p class="outnote">Recién ahora, ~1.2s después, el worker terminó de esperar la respuesta lenta, hizo ack y arrancó el siguiente -- exactamente 1 mensaje por segundo, sin superposición.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">max in_flight: <b>1</b></span></div>
+          <pre class="outterm">  max in_flight observado: 1
+
+Confirmado: con WORKER_CONCURRENCY=1, in_flight nunca pasa de 1 -- los demas mensajes esperan su turno en la cola (Ready), de a uno, aunque el downstream pudiera atender varios en paralelo.</pre>
+          <p class="outnote">12 mensajes, ~12 segundos en total: el downstream podría atender varios pedidos en paralelo, pero con un solo worker nunca se le pide más de uno a la vez.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Escenario B</span><span class="badge">Ready: <b>9</b></span><span class="badge">in_flight: <b>3/3</b></span><span class="badge">Procesados: <b>0/12</b></span></div>
+          <pre class="outterm">=== Escenario B: WORKER_CONCURRENCY=3 ===
+12 mensajes publicados.
+    t=  0.0s  queued(ready)= 9  in_flight=3/3  procesados= 0/12</pre>
+          <p class="outnote">Con 3 workers ya suscritos antes de publicar, los 3 primeros mensajes se reparten al instante -- Ready baja de 12 a 9 de una, no de a uno como en el Escenario A.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">Ready: <b>6</b></span><span class="badge">in_flight: <b>3/3</b></span><span class="badge">Procesados: <b>3/12</b></span></div>
+          <pre class="outterm">  [worker-3] proceso 'msg-3' (in_flight llego a 1)
+  [worker-1] proceso 'msg-2' (in_flight llego a 3)
+  [worker-2] proceso 'msg-1' (in_flight llego a 2)
+    t=  1.2s  queued(ready)= 6  in_flight=3/3  procesados= 3/12</pre>
+          <p class="outnote">Los 3 workers terminan casi juntos (~1.2s) y agarran los siguientes 3 -- el orden entre worker-1/2/3 no es determinista, es una carrera por consumir el próximo mensaje disponible.</p>
+        </div><div class="outstep">
+          <div class="outbadges"><span class="badge">max in_flight: <b>3</b></span></div>
+          <pre class="outterm">  max in_flight observado: 3
+
+Confirmado: con WORKER_CONCURRENCY=3, in_flight sube hasta 3 y se mantiene ahi -- 'queued sube, in_flight tope en N, queued baja de a N', el mecanismo real de la congestion, reconstruido con basic_qos(prefetch_count=1) x3 + ack manual + un cliente HTTP con timeout partido -- sin Celery ni Postgres de por medio.</pre>
+          <p class="outnote">12 mensajes en 4 rondas de 3, terminando en ~4-5s en vez de los ~12s del Escenario A -- el mismo patrón de "rondas" del paso 05, pero ahora el límite es <code>WORKER_CONCURRENCY</code>, no un pool HTTP.</p>
+        </div>
+        <div class="outnav">
+          <button class="outbtn outprev">&larr; Anterior</button>
+          <div class="outdots"><button class="outdot" data-i="0"></button><button class="outdot" data-i="1"></button><button class="outdot" data-i="2"></button><button class="outdot" data-i="3"></button><button class="outdot" data-i="4"></button><button class="outdot" data-i="5"></button><button class="outdot" data-i="6"></button></div>
+          <span class="outcount"></span>
+          <button class="outbtn outnext primary">Siguiente &rarr;</button>
+        </div>
+      </div>
+    </div>
+    </section>
+
+    <section class="panel" id="panel-roadmap" data-index="8" role="tabpanel" aria-labelledby="tab-roadmap">
+      <div class="panel-head">
+        <p class="kicker">Cierre</p>
+        <h2>01–07: reconstrucción completa</h2>
+        <p class="tagline">Todos los mecanismos del incidente, aislados uno por uno y después integrados -- sin cajas negras.</p>
+      </div>
+      <div class="prose">
+<p>Con los pasos 01–07 completos queda reconstruido, pieza por pieza, todo el mecanismo que hace
+falta para entender cómo se arma este tipo de congestión de colas -- <code>RUNBOOK.md</code> marca
+este bloque como cerrado. Un repaso rápido de cómo se llegó hasta acá:</p>
+<ul>
+  <li><strong>01–02</strong> establecen cómo RabbitMQ entrega y confirma mensajes (Connection/Channel/Queue, <code>basic_consume</code> + ack manual).</li>
+  <li><strong>03</strong> le pone un límite a cuánto puede acaparar un consumer (<code>prefetch_count</code>).</li>
+  <li><strong>04–05</strong> muestran, del lado del cliente HTTP, cómo un timeout mal configurado disfraza el agotamiento de un pool de conexiones.</li>
+  <li><strong>06</strong> agrega la pieza de resiliencia que corta el tráfico hacia un downstream que ya se sabe caído.</li>
+  <li><strong>07</strong> junta todo: <code>WORKER_CONCURRENCY</code> como semáforo de aplicación ocupando un slot mientras un consumer de RabbitMQ llama al cliente HTTP lento -- "queued sube, in_flight tope en N, queued baja de a N", el mecanismo completo.</li>
+</ul>
+<p class="muted">Sin Celery ni Postgres de por medio -- solo RabbitMQ + Python puro, un concepto por script.</p>
+</div>
+    </section>
+    
+    </div>
+    <div class="navbar">
+      <button class="nav-btn" id="prevBtn">&larr; Anterior</button>
+      <span class="nav-center" id="navCenter"></span>
+      <button class="nav-btn primary" id="nextBtn">Siguiente &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<script>
+(function () {
+  var panels = Array.prototype.slice.call(document.querySelectorAll(".panel"));
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".side-item"));
+  var total = panels.length;
+  var current = 0;
+  var highlighted = false;
+
+  function clamp(n) { return Math.max(0, Math.min(total - 1, n)); }
+
+  function render() {
+    panels.forEach(function (p, i) { p.classList.toggle("active", i === current); });
+    tabs.forEach(function (t, i) {
+      t.classList.toggle("active", i === current);
+      t.setAttribute("aria-selected", i === current ? "true" : "false");
+    });
+    document.getElementById("progressFill").style.width = ((current + 1) / total * 100) + "%";
+    document.getElementById("progressText").textContent = "Paso " + (current + 1) + " de " + total;
+    document.getElementById("navCenter").textContent = (current + 1) + " / " + total;
+    document.getElementById("prevBtn").disabled = current === 0;
+    var nextBtn = document.getElementById("nextBtn");
+    if (current === total - 1) {
+      nextBtn.textContent = "Fin";
+      nextBtn.disabled = true;
+    } else {
+      nextBtn.textContent = "Siguiente →";
+      nextBtn.disabled = false;
+    }
+    var active = tabs[current];
+    if (active && active.scrollIntoView) {
+      active.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    var stage = document.getElementById("stage");
+    if (stage) stage.scrollTop = 0;
+    history.replaceState(null, "", "#" + panels[current].id);
+    if (!highlighted && window.hljs) {
+      document.querySelectorAll("pre code").forEach(function (b) { window.hljs.highlightElement(b); });
+      highlighted = true;
+    }
+  }
+
+  function goTo(i) { current = clamp(i); render(); }
+
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () { goTo(parseInt(t.dataset.goto, 10)); });
+  });
+  document.getElementById("prevBtn").addEventListener("click", function () { goTo(current - 1); });
+  document.getElementById("nextBtn").addEventListener("click", function () { goTo(current + 1); });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.closest("details") || e.target.closest(".outsteps")) return;
+    if (e.key === "ArrowRight") goTo(current + 1);
+    if (e.key === "ArrowLeft") goTo(current - 1);
+  });
+
+  var hash = location.hash.replace("#", "");
+  var startIndex = 0;
+  if (hash) {
+    var found = panels.findIndex(function (p) { return p.id === hash; });
+    if (found >= 0) startIndex = found;
+  }
+  goTo(startIndex);
+
+  // ---- mini-stepper independiente por panel para "Salida paso a paso" ----
+  document.querySelectorAll(".outsteps").forEach(function (container) {
+    var steps = Array.prototype.slice.call(container.querySelectorAll(".outstep"));
+    var dots = Array.prototype.slice.call(container.querySelectorAll(".outdot"));
+    var idx = 0;
+
+    function renderOut() {
+      steps.forEach(function (s, i) { s.classList.toggle("active", i === idx); });
+      dots.forEach(function (d, i) { d.classList.toggle("active", i === idx); });
+      container.querySelector(".outprev").disabled = idx === 0;
+      var nextBtn = container.querySelector(".outnext");
+      nextBtn.disabled = idx === steps.length - 1;
+      nextBtn.textContent = idx === steps.length - 1 ? "Fin ✓" : "Siguiente →";
+      container.querySelector(".outcount").textContent = (idx + 1) + " / " + steps.length;
+    }
+
+    container.querySelector(".outprev").addEventListener("click", function () {
+      idx = Math.max(0, idx - 1); renderOut();
+    });
+    container.querySelector(".outnext").addEventListener("click", function () {
+      idx = Math.min(steps.length - 1, idx + 1); renderOut();
+    });
+    dots.forEach(function (d, i) {
+      d.addEventListener("click", function () { idx = i; renderOut(); });
+    });
+    renderOut();
+  });
+})();
+</script>
+</body>
+</html>

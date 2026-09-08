@@ -1,60 +1,11 @@
 """
 Paso 1: lo minimo indispensable para hablar con RabbitMQ.
 
-Conceptos que este script toca (y nada mas que estos, a proposito):
-
-- Connection: la conexion TCP real contra el servidor RabbitMQ (localhost:5672
-  porque el docker-compose expone ese puerto). Es "pesada": abrirla cuesta un
-  handshake TCP + autenticacion.
-- Channel: un "canal virtual" que viaja DENTRO de una connection. Casi todas
-  las operaciones (declarar colas, publicar, consumir) se hacen sobre un
-  channel, no sobre la connection directamente. Una connection puede tener
-  muchos channels; asi una sola conexion TCP sirve para varias operaciones
-  concurrentes sin abrir un socket por cada una.
-- Queue: el buffer de mensajes en si. "Declarar" una cola es idempotente: si
-  no existe la crea, si ya existe con la misma config no hace nada.
-- Publish / Consume: publicar deja un mensaje en la cola; consumir lo saca.
-  Aqui hacemos ambas cosas en el mismo script solo para comprobar que el viaje
-  redondo funciona.
-
-Nada de timeouts, pools ni concurrencia todavia -- eso viene despues.
-
 Como probar:
 
     docker compose up -d
     pip install -r requirements.txt
     python3 01_connect_and_queue.py
-
-Host/puerto salen de las variables de entorno RABBITMQ_HOST/RABBITMQ_PORT
-(default localhost:5672). Util para meter un proxy en medio, p.ej. mitmproxy:
-
-    RABBITMQ_PORT=8080 python3 01_connect_and_queue.py
-
-Salida esperada:
-
-    Conexion abierta.
-    Channel abierto.
-    Cola 'step1_queue' declarada.
-    Mensaje publicado: 'hola desde step1'
-    Mensaje recibido de vuelta: 'hola desde step1'
-    Conexion cerrada.
-
-Para ver el estado en la UI entre paso y paso, pon un breakpoint (o F5 con el
-debugger) entre las lineas que te interesen y revisa
-http://localhost:15672 (guest/guest, pestana Queues -> step1_queue).
-
-Que vas a ver en la UI en cada paso (pestana Queues -> step1_queue):
-
-    - Antes de queue_declare(): la cola puede ni aparecer en el listado
-      (si es la primera vez que corres el script).
-    - Despues de queue_declare(): aparece con Ready=0, Unacked=0, Total=0,
-      consumers=0.
-    - Despues de basic_publish(): Ready pasa a 1 -- el mensaje esta ahi
-      sentado, nadie lo ha tocado.
-    - Despues de basic_get(auto_ack=True): Ready vuelve a 0. A diferencia
-      del "Get messages" de la UI con Ack Mode "Nack message requeue true"
-      (que lo regresa a la cola), auto_ack=True lo borra para siempre en
-      cuanto se entrega -- no hay ventana donde quede "Unacked".
 """
 
 import os

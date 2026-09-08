@@ -1,64 +1,10 @@
 """
 Paso 4: timeout bare-int vs `httpx.Timeout` partido.
 
-Este paso ya NO usa RabbitMQ -- es standalone, contra un servidor propio
-(stdlib puro, sin FastAPI) que este mismo script levanta en un hilo y que
-simplemente duerme SLEEP_SECONDS antes de responder 200. La idea es aislar
-UN solo cliente HTTP (httpx) y comparar `timeout` bare-int vs
-`httpx.Timeout(connect=, read=, write=, pool=)`, sin nada mas alrededor
-(sin Celery, sin Postgres, sin circuit breaker -- eso es el paso 06).
-
-En httpx, `timeout=20` (un int/float suelto) es en realidad un atajo que
-`httpx.Timeout` expande internamente a CUATRO presupuestos identicos:
-
-    connect=20, read=20, write=20, pool=20
-
-- connect: cuanto esperar a que el socket TCP termine el handshake.
-- write: cuanto esperar a mandar el body del request.
-- read: cuanto esperar la respuesta una vez conectado (esto es "el
-  downstream tardo").
-- pool: cuanto esperar a que el POOL DE CONEXIONES libere un slot para este
-  request, ANTES de que se intente conectar siquiera (esto es "espere un
-  slot libre", nada que ver con que tan rapido responda el downstream).
-
-Con un bare-int, esos cuatro presupuestos son forzosamente el mismo numero.
-El problema no es que httpx deje de distinguir las fases -- SI lo hace
-internamente, cada una tiene su reloj -- el problema es que con un solo
-numero no puedes darle a `pool` un presupuesto corto (para fallar rapido si
-el pool esta agotado) mientras le das a `read` uno largo (para tolerar un
-downstream legitimamente lento). Si el numero es lo bastante grande para
-tolerar el `read` lento, tambien es lo bastante grande para que una espera
-larga de `pool` pase completamente desapercibida: el request simplemente
-tarda mas, sin ningun error, indistinguible de "el downstream fue mas lento
-esta vez".
-
-Demo (mismo servidor lento en los dos escenarios, `httpx.Limits(
-max_connections=1)` a proposito -- un pool de 1 sola conexion garantiza que
-dos requests concurrentes SI o SI compiten por el mismo slot):
-
-    Escenario A -- timeout=BARE_TIMEOUT (bare int, mismo numero para las
-    4 fases). req-1 y req-2 salen "al mismo tiempo" (asyncio.gather), pero
-    con pool de 1 conexion, req-2 tiene que esperar a que req-1 suelte el
-    slot antes de empezar su propia llamada. Con un presupuesto bare-int
-    generoso, esa espera se disuelve dentro del mismo margen que el read
-    normal: req-2 termina OK, solo que mas lento -- ningun error, ninguna
-    senal de que el motivo fue "esperar un slot" y no "el downstream tardo".
-
-    Escenario B -- httpx.Timeout(connect=, read=, write=, pool=) con `pool`
-    deliberadamente corto. Mismo servidor, mismo pool de 1 conexion. req-1
-    igual, pero ahora req-2 falla RAPIDO con un `httpx.PoolTimeout` explicito
-    en cuanto se vence el presupuesto corto de `pool` -- una senal clara y
-    distinta de "estuve esperando un slot", separada del presupuesto de
-    `read` (que sigue siendo generoso para tolerar un downstream lento de
-    verdad).
-
 Como probar:
 
     pip install -r requirements.txt   # agrega httpx
     python3 04_http_timeout.py
-
-No hay RabbitMQ ni UI que mirar en este paso -- toda la evidencia sale por
-stdout: status/excepcion y tiempo transcurrido de cada request.
 """
 
 import asyncio

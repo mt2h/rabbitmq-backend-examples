@@ -2,67 +2,10 @@
 Paso 5: agotamiento real del pool de conexiones (`httpx.Limits`) y como el
 timeout bare-int disfraza el `PoolTimeout` resultante.
 
-Sigue siendo standalone (sin RabbitMQ), igual que el paso 04, contra el mismo
-tipo de servidor propio (stdlib `ThreadingHTTPServer`) que duerme
-SLEEP_SECONDS y responde 200. La diferencia con el paso 04 es la escala: ahi
-eran 2 requests contra un pool de 1 conexion (solo para ver que el error
-`PoolTimeout` existe). Aca son N_REQUESTS concurrentes contra un pool de
-POOL_SIZE conexiones con N_REQUESTS > POOL_SIZE -- agotamiento real, en
-"tandas": el pool solo puede atender POOL_SIZE requests a la vez, asi que se
-forman rondas que esperan su turno.
-
-Con POOL_SIZE=3 y N_REQUESTS=12 se forman 4 rondas de 3 requests cada una.
-Si nadie fallara, la ronda K empezaria a correr recien en
-t=(K-1)*SLEEP_SECONDS (tuvo que esperar a que las rondas anteriores liberaran
-conexion) y terminaria en t=K*SLEEP_SECONDS.
-
-Escenario A -- timeout=BARE_TIMEOUT (bare-int, connect/read/write/pool
-comparten el mismo numero). Cada fase tiene su propio presupuesto de
-BARE_TIMEOUT segundos (no es un presupuesto acumulado: httpx reinicia el
-reloj al pasar de la fase "pool" a la fase "read"), asi que una ronda
-sobrevive mientras SU espera de pool, sola, se mantenga por debajo de
-BARE_TIMEOUT -- sin importar cuanto hayan tardado las rondas anteriores. Con
-BARE_TIMEOUT=5s, las rondas 1-3 esperan 0s/2s/4s por un slot (todas < 5s):
-pasan. La ronda 4 necesitaria esperar ~6s por un slot: eso SI supera los 5s,
-entonces httpx corta esa espera con un `PoolTimeout` real y explicito a los
-5s -- no un timeout generico ni un cuelgue silencioso.
-
-Entonces, si el tipo de excepcion ya es el correcto (`PoolTimeout`), donde
-esta el disfraz? En que ese `PoolTimeout` aparece marcado con el MISMO numero
-(5s) que cualquier lectura lenta legitima tendria si el downstream de verdad
-tardara 5s en responder. Mirando solo "elapsed ~5s, TimeoutException", no hay
-forma de saber si el problema fue "no habia conexiones libres" (se arregla
-subiendo `max_connections`) o "el downstream esta lento de verdad" (se
-arregla optimizando el downstream, o tolerandolo) -- ambos comparten el mismo
-presupuesto porque bare-int no permite darles numeros distintos.
-
-Escenario B -- httpx.Timeout(connect=, read=, write=, pool=) con `pool`
-deliberadamente corto (1s) y separado de `read` (5s, generoso). Ahora
-CUALQUIER ronda que tenga que esperar mas de 1s por un slot falla rapido y
-explicito: solo la ronda 1 (espera 0s) pasa: las rondas 2, 3 y 4 (que
-necesitarian esperar 2s, 4s y 6s respectivamente) fallan las tres a los ~1s
-con `PoolTimeout` -- mucho antes y a una escala de tiempo completamente
-distinta (~1s) que la de un `read` lento de verdad (~2s, el que si consigue
-slot). La separacion ya no es solo de tipo de excepcion: es de magnitud, y
-esa magnitud es la que permite detectar agotamiento de pool sin ambiguedad,
-sin tocar para nada la paciencia que se le da a un downstream lento.
-
-Caveat honesto (el mismo del README de `_backup_original`, seccion 3): en un
-worker Celery real esto casi no aplica, porque cada worker procesa UNA tarea
-a la vez -- no hay "requests concurrentes del mismo proceso" compitiendo por
-el mismo pool. Sigue valiendo la pena entenderlo porque si aplica tal cual a
-un servicio FastAPI/asyncio que atiende varias requests a la vez con
-`asyncio.gather` (o simplemente varias requests HTTP entrantes en paralelo)
-compartiendo un mismo `httpx.AsyncClient`.
-
 Como probar:
 
     pip install -r requirements.txt   # ya incluye httpx
     python3 05_pool_exhaustion.py
-
-No hay RabbitMQ ni UI que mirar en este paso -- toda la evidencia sale por
-stdout: por cada request, tipo de resultado y tiempo transcurrido; al final
-de cada escenario, un resumen contado por tipo de excepcion.
 """
 
 import asyncio

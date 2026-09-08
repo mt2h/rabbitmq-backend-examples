@@ -1,81 +1,10 @@
 """
 Paso 2: basic_consume + ack manual.
 
-En 01 usamos basic_get(auto_ack=True): "dame un mensaje si hay, y en cuanto me
-lo entregas dalo por confirmado y borralo". Eso es un atajo de demo. El
-mecanismo real que nos interesa (y que Celery implementa con
-task_acks_late=True) depende de un estado intermedio que auto_ack=True se
-salta por completo:
-
-    entregado (delivered) != confirmado (acked)
-
-Cuando un consumer recibe un mensaje con auto_ack=False, RabbitMQ lo marca
-como "unacked" y lo saca de la cola visualmente, PERO no lo borra de verdad.
-Ese mensaje sigue "perteneciendo" a esa conexion/canal hasta que:
-
-  - el consumer manda channel.basic_ack(delivery_tag) -> RabbitMQ lo borra
-    para siempre.
-  - el consumer manda channel.basic_nack(delivery_tag, requeue=True) -> vuelve
-    a la cola inmediatamente para que otro consumer lo tome.
-  - la conexion/canal se cierra (crash, kill -9, excepcion no capturada) SIN
-    haber mandado ack -> RabbitMQ lo redelivera automaticamente (a este u
-    otro consumer) porque nunca se confirmo.
-
-Ese ultimo caso es exactamente lo que hace Celery con acks_late=True: si el
-worker muere a la mitad de una tarea, la tarea nunca se dio por completada y
-Rabbit la vuelve a poner en la cola. Es una garantia de "al menos una vez"
-(at-least-once), pagada con el riesgo de reprocesar tareas si el worker muere
-DESPUES de terminar el trabajo pero ANTES de mandar el ack.
-
-Tambien cambiamos de basic_get a basic_consume: basic_get es "pull" (yo pido
-un mensaje cuando quiero). basic_consume es "push" -- te registras con un
-callback y RabbitMQ te empuja mensajes segun van llegando. Es el modelo que
-usan los consumers reales (incluido kombu/Celery por debajo), y es el que
-necesitamos para que el prefetch (paso 03) tenga sentido.
-
-Demo de este script (todo con la MISMA conexion, en dos rondas):
-
-    Ronda 1: publicamos 3 mensajes. Los consumimos con basic_consume /[
-    auto_ack=False. Al msg 1 y 3 los ackeamos normal. Al msg 2 lo procesamos
-    pero A PROPOSITO no lo ackeamos (simulamos que el consumer "muere" ahi).
-    Cerramos la conexion sin ackearlo.
-
-    Ronda 2: abrimos una conexion nueva y consumimos de nuevo. El msg 2
-    reaparece solo -- Rabbit lo redelivero porque nadie lo habia confirmado.
-    Esta vez si lo ackeamos.
-
 Como probar:
 
     docker compose up -d
     python3 02_basic_consume_ack.py
-
-Host/puerto salen de RABBITMQ_HOST/RABBITMQ_PORT igual que en el paso 01.
-
-Para ver el estado en la UI entre paso y paso, pon un breakpoint (o F5 con
-el debugger) entre las lineas que te interesen y revisa
-http://localhost:15672 (guest/guest, pestana Queues -> step2_queue).
-
-Que vas a ver en la UI en cada paso (pestana Queues -> step2_queue):
-
-    - Despues de publicar los 3 mensajes: Ready=3, Unacked=0, consumers=0
-      (todavia nadie se suscribio).
-    - En cuanto arranca basic_consume (antes de que el callback procese
-      nada): consumers=1, y Ready/Unacked se mueven juntos: Rabbit le
-      empuja los 3 de una al consumer, asi que veras Ready=0, Unacked=3
-      un instante (los 3 "entregados pero no confirmados").
-    - Justo despues de ackear mensaje-1: Unacked baja a 2 (Total=2).
-    - Justo despues de "no ackear" mensaje-2 (a proposito): Unacked se
-      queda en esa cuenta -- ese mensaje no se mueve de ahi.
-    - Justo despues de ackear mensaje-3: Unacked baja a 1 (solo queda
-      mensaje-2, unacked, ligado a este canal).
-    - Al cerrar la conexion de ronda 1 SIN ackear mensaje-2: consumers
-      vuelve a 0, y Ready sube a 1 de nuevo -- Rabbit detecto el canal
-      muerto con un mensaje unacked y lo re-encolo solo. Este es el
-      momento clave: nadie "reenvio" nada, Rabbit lo hizo por su cuenta.
-    - En ronda 2, apenas basic_consume arranca: Ready=0, Unacked=1
-      (mensaje-2, redeliverado -- nota que la propiedad "redelivered"
-      del mensaje viene en True si lo miras con Get messages en la UI).
-    - Despues del ack final: Ready=0, Unacked=0, cola vacia.
 """
 
 import os

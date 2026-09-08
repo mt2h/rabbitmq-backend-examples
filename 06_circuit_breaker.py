@@ -2,74 +2,9 @@
 Paso 6: CircuitBreaker (CLOSED / OPEN / HALF_OPEN) -- comparar un breaker que
 nunca abre contra uno que si protege al downstream.
 
-Standalone, sin RabbitMQ, igual que 04 y 05 -- downstream propio (stdlib
-`ThreadingHTTPServer`), esta vez sin dormir: responde 500 al instante mientras
-esta "enfermo", y 200 cuando lo marcamos "sano". El punto de este paso no es
-la latencia (eso ya lo vimos en 04/05) sino CUANTAS veces llegamos a tocar un
-downstream que ya sabemos que esta fallando.
-
-La clase `CircuitBreaker` de abajo implementa la maquina de tres estados
-clasica -- `can_execute`/`on_success`/`on_failure`:
-
-    CLOSED:    dejar pasar todo. Es el estado inicial.
-    OPEN:      cortar todo -- `can_execute()` devuelve False sin tocar la
-               red, hasta que pase `recovery_timeout` segundos desde el
-               ultimo fallo.
-    HALF_OPEN: pasado ese tiempo, dejar pasar UN request de prueba. Si sale
-               bien (`on_success`) vuelve a CLOSED; si sale mal
-               (`on_failure`), vuelve a sumar al contador y puede reabrir.
-
-`failure_count` sube en cada `on_failure()` y se resetea a 0 en cualquier
-`on_success()`. En cuanto `failure_count >= failure_threshold`, el estado pasa
-a OPEN. Con un `failure_threshold` astronomicamente alto (p.ej. 999999) ese
-umbral jamas se alcanza en la practica -- el breaker se queda en CLOSED para
-siempre, dejando pasar cada request nuevo hacia un downstream que ya demostro
-(muchas veces) que esta caido. Con un umbral chico y razonable (p.ej. 3), al
-tercer fallo seguido el breaker abre y los requests siguientes se cortan
-localmente, sin generar ni un solo byte de trafico hacia el downstream muerto.
-
-Ojo con un detalle si mas adelante esto se combina con retries/backoff: cada
-intento fallido DENTRO de un mismo request ya cuenta como su propio
-`on_failure()`, asi que un solo mensaje reintentado varias veces puede el solo
-empujar el contador varios pasos. Ese es un mecanismo aparte (retry/backoff),
-no el circuit breaker en si, asi que aqui `call_downstream()` hace UN intento
-por llamada, sin retries -- para aislar exactamente lo que hacen
-`can_execute()`/`on_success()`/`on_failure()`, sin mezclarlo con cuantas veces
-reintenta un request individual.
-
-Demo (downstream propio, arranca "enfermo" -- responde 500 a todo):
-
-    Escenario A -- CircuitBreaker(failure_threshold=999999). Mandamos
-    N_REQUESTS llamadas seguidas. Las N_REQUESTS tocan de verdad al
-    downstream (total_requests del downstream sube de a uno por cada
-    llamada) y las N_REQUESTS fallan -- el breaker sigue CLOSED todo el
-    tiempo, nunca protege nada.
-
-    Escenario B -- CircuitBreaker(failure_threshold=3), downstream de nuevo
-    "enfermo" desde cero. Los primeros 3 requests SI tocan al downstream y
-    fallan (failure_count llega a 3 -> el breaker abre). Del 4to en adelante,
-    `can_execute()` devuelve False de entrada: esos requests se cortan LOCAL,
-    sin que el downstream vea ni un solo request mas -- total_requests del
-    downstream se queda congelado en 3 para siempre, sin importar cuantos
-    mensajes mas lleguen.
-
-    Recuperacion (mismo breaker de escenario B, ya OPEN): esperamos
-    RECOVERY_TIMEOUT segundos y marcamos el downstream como "sano" (200 en
-    vez de 500) -- simula que el downstream se recupero mientras el breaker
-    seguia abierto. El siguiente `can_execute()` nota que ya paso
-    `recovery_timeout` desde el ultimo fallo, pasa a HALF_OPEN y deja pasar
-    UN request de prueba. Como el downstream ya responde 200, ese request
-    dispara `on_success()` -> el breaker vuelve a CLOSED, con el contador de
-    fallos en 0 otra vez.
-
 Como probar:
 
     python3 06_circuit_breaker.py
-
-No hay RabbitMQ ni UI que mirar en este paso -- toda la evidencia sale por
-stdout: por cada request, si toco al downstream o se corto local, y el estado
-del breaker; al final de cada escenario, cuantos requests en total llegaron
-de verdad al downstream.
 """
 
 import http.server

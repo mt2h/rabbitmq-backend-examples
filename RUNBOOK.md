@@ -1,8 +1,8 @@
-# oz-timeout-repro — runbook / plan de aprendizaje
+# runbook / plan de aprendizaje
 
 Objetivo: reconstruir, paso a paso y sin cajas negras, todos los mecanismos que
-`_backup_original/` combina para reproducir la congestión de colas real de
-`oz-zecore-connector-service` (ver `_backup_original/README.md`). Cada script
+`_backup_original/` combina para reproducir una congestión de colas real
+(ver `_backup_original/README.md`). Cada script
 numerado aisla UN concepto; al final (paso 07) se juntan todos y se ve el
 mecanismo completo con scripts propios, sin depender del stack docker-compose
 original.
@@ -114,18 +114,11 @@ python3 01_connect_and_queue.py
 
 ### Bloque integración
 
-- [ ] **07 — Worker slots (semaphore) + prefetch + HTTP lento, todo junto**:
+- [x] **07 — Worker slots (semaphore) + prefetch + HTTP lento, todo junto**:
   recrear `WORKER_CONCURRENCY` como semaphore que un consumer de RabbitMQ (02
   + 03) ocupa mientras llama al HTTP client lento (04-06). Acá se ve por fin
   "queued sube, in_flight tope en N, queued baja de a N" — el mecanismo
   completo, con scripts propios, sin Postgres ni docker-compose de por medio.
-- [ ] **08 (opcional)** — comparar endpoint1 (bad: bare-int + breaker que
-  nunca abre) vs endpoint2 (good: timeout partido + breaker que sí abre) lado
-  a lado, replicando los dos findings principales del README con números
-  propios.
-- [ ] **09 (opcional)** — múltiples replicas/consumers compartiendo la misma
-  cola, para la sección final del README (KEDA-scaled pods).
 
 Con 01-07 completos queda reconstruido, pieza por pieza, todo lo que hace
-`_backup_original/`. 08 y 09 son profundización, no esenciales para entender
-el problema.
+`_backup_original/`. Roadmap cerrado acá.
